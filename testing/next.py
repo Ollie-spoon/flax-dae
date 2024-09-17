@@ -1,3 +1,5 @@
+""" Demonstrates the use of the next() function and the StopIteration exception. """
+
 import numpy as np
 import random
 
@@ -17,4 +19,4 @@ class RandomIterable:
         return 1
 
 for i in range(5):
-    print(list(RandomIterable()))
+    print("i=", i, ": ", list(RandomIterable()))

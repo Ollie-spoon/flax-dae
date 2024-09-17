@@ -1,3 +1,5 @@
+"""Demonstrates the buffer protocol using the Pillow library."""
+
 from PIL import Image
 import numpy as np
 
