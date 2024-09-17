@@ -48,7 +48,7 @@ def train_step(state, batch, model_args, dropout_rng):
     noisy_data, noiseless_data = batch
     
     def loss_fn(params):
-        recon_x = models.model(*model_args).apply(
+        recon_x = models.model(**model_args).apply(
             {'params': params},
             x=noisy_data,
             deterministic=False,
@@ -79,7 +79,7 @@ def eval_f(params, batch, model_args):
         metrics = compute_metrics(recon_x, noiseless_data)
         return metrics# , comparison
 
-    return nn.apply(eval_model, models.model(*model_args))({'params': params})
+    return nn.apply(eval_model, models.model(**model_args))({'params': params})
 
 
 def train_and_evaluate(config: ml_collections.ConfigDict):
@@ -89,12 +89,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     rng = random.key(0)
     rng, init_rng = random.split(rng)
     
-    model_args = (
-        config.latents, 
-        config.hidden, 
-        config.dropout_rate, 
-        config.io_dim
-        )
+    model_args = {
+        "latents": config.latents, 
+        "hidden": config.hidden, 
+        "dropout_rate": config.dropout_rate, 
+        "io_dim": config.io_dim
+    }
     
     # Load the data
     train_ds, steps_per_epoch = input_pipeline.build_train_set(config.data_path, config.batch_size)
@@ -103,11 +103,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     # Initialize the model with some dummy data
     logging.info('Initializing model.')
     init_data = jnp.ones((config.batch_size, config.io_dim), jnp.float32)
-    params = models.model(*model_args).init(init_rng, init_data)['params']
+    params = models.model(**model_args).init(init_rng, init_data)['params']
 
     # Initialize the training state including the optimizer
     state = train_state.TrainState.create(
-        apply_fn=models.model(*model_args).apply,
+        apply_fn=models.model(**model_args).apply,
         params=params,
         tx=optax.adam(config.learning_rate),
     )
