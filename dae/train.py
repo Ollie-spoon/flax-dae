@@ -232,7 +232,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
     metric_list = []
     
-    print(f"time taken to")
+    print(f"time taken to initialize: {time()-time_keeping:.3f}s")
+    del time_keeping
     
     # Train the model
     for epoch in range(config.num_epochs):
@@ -256,6 +257,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             kwargs=data_args,
             ))
         
+        print(f"time taken to generate data: {time()-start_time:.3f}s")
+        time_keeping = time()
+        
         # print(f"test_batch.shape: {len(test_batch)}")
         # print(f"test_batch[0].shape: {test_batch[0].shape}")
         # print(f"test_batch[1].shape: {test_batch[1].shape}")
@@ -264,9 +268,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         for batch in train_ds:
             rng, dropout_rng = random.split(rng)
             state = train_step(state, batch, model_args, dropout_rng)
+        
+        print(f"time taken to train: {time()-time_keeping:.3f}s")
+        time_keeping = time()
 
         # Evaluate the model
         metrics, comparison = eval_f(state.params, test_batch, model_args)
+        
+        print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
+        
         # print(f"metrics: {metrics}")
         # print(f"comparison: {comparison}")
         metric_list.append(metrics)
