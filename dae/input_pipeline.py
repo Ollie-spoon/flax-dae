@@ -18,6 +18,7 @@ import jax
 import jax.numpy as jnp
 import tensorflow as tf
 import tensorflow_datasets as tfds
+from generate_data import generate_basic_data
 
 def load_data(data_path, test_size=0.1):
     # Load the .npy file
@@ -33,6 +34,24 @@ def load_data(data_path, test_size=0.1):
     train_noiseless, test_noiseless = noiseless_data[:split_point], noiseless_data[split_point:]
     
     return (train_noisy, train_noiseless), (test_noisy, test_noiseless)
+
+# instead of loading the data from a file, we will generate it
+def generate_original_data(iterations: int, train: bool, batch_size: int, kwargs):
+    # print("Generating data.")
+    # print("diagnostics: \niterations: ", iterations, "\ntrain: ", train, "\nbatch_size: ", batch_size, "\nkwargs: ", kwargs)
+    
+    kwargs["iterations"] = iterations
+    data = generate_basic_data(**kwargs)
+    
+    noisy_data = data[:, 0, :]  # Noisy version
+    noiseless_data = data[:, 1, :]  # Noiseless version
+    
+    ds = tf.data.Dataset.from_tensor_slices((noisy_data, noiseless_data))
+    
+    # No need to cache, shuffle, or repeat the dataset
+    ds = ds.batch(batch_size)
+    
+    return iter(tfds.as_numpy(ds))
 
 def build_train_set(data_path, batch_size):
     """Builds a training dataset from custom data."""
@@ -79,12 +98,12 @@ def build_test_set(data_path, batch_size=200):
     # Return the dataset as a Numpy iterable
     return iter(tfds.as_numpy(test_ds)), num_samples
 
-print("Initializing dataset.")
-data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
-batch_size = 100
-data = build_train_set(data_path, batch_size)
+# print("Initializing dataset.")
+# data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
+# batch_size = 100
+# data = build_train_set(data_path, batch_size)
 
-print(data)
+# print(data)
 
 
 ## THIS IS THE ORIGINAL IMAGE BASED IMPLEMENTATION OF THE INPUT PIPELINE

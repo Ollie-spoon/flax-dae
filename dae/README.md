@@ -4,9 +4,9 @@ This is an implementation of the paper [Auto-Encoding with Variational Bayes](ht
 This code follows [pytorch/examples/vae](https://github.com/pytorch/examples/blob/master/vae/README.md).
 
 ```bash
-pip install -r requirements.txt
+pip install -r dae/requirements.txt
 python main.py --workdir=/tmp/mnist --config=configs/default.py
-& C:/Users/omnic/OneDrive/Documents/MIT/Programming/.venv/Scripts/python.exe c:/Users/omnic/OneDrive/Documents/MIT/Programming/dae/flax/vae/main.py --config=flax/vae/configs/default.py
+& C:/Users/omnic/OneDrive/Documents/MIT/Programming/.venv/Scripts/python.exe c:/Users/omnic/OneDrive/Documents/MIT/Programming/dae/flax/dae/main.py --working_dir="" --config="dae/configs/default.py"
 ```
 
 ## Overriding Hyperparameter configurations

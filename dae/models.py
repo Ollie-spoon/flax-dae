@@ -15,8 +15,6 @@
 """VAE model definitions."""
 
 from flax import linen as nn
-from jax import random
-import jax.numpy as jnp
 
 
 class Encoder(nn.Module):
@@ -29,8 +27,8 @@ class Encoder(nn.Module):
   @nn.compact
   def __call__(self, x, deterministic):
     x = nn.Dense(self.hidden, name='fc1')(x)
-    x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     x = nn.gelu(x)
+    x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     x = nn.Dense(self.latents, name='fc2_mean')(x)
     return x
 
@@ -45,8 +43,8 @@ class Decoder(nn.Module):
   @nn.compact
   def __call__(self, z, deterministic):
     z = nn.Dense(self.hidden, name='fc1')(z)
-    z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
     z = nn.gelu(z)
+    z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
     z = nn.Dense(self.io_dim, name='fc2')(z)
     return z
 
@@ -54,10 +52,10 @@ class Decoder(nn.Module):
 class DAE(nn.Module):
     """Full VAE model."""
 
-    latents: int = 20
-    hidden: int = 50
-    dropout_rate: float = 0.05
-    io_dim: int = 95
+    latents: int
+    hidden: int
+    dropout_rate: float
+    io_dim: int
 
     def setup(self):
         self.encoder = Encoder(
