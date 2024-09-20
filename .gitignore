@@ -1,2 +1,6 @@
-.tmp/
+tmp/
+dae/__pycache__/
 *.png
+*.jpg
+*.pkl
+
