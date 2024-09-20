@@ -86,9 +86,11 @@ def plot_inverse_loss(metric_list, save_path):
 
     # Set the x-axis label
     ax.set_xlabel('Time')
+    ax.set_xscale('log')
 
     # Set the y-axis label
     ax.set_ylabel('Accuracy (Inverse of the Loss)')
+    ax.set_yscale('log')
 
     # Add a legend
     ax.legend()

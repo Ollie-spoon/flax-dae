@@ -21,13 +21,13 @@ def get_config():
     """Get the default hyperparameter configuration."""
     config = ml_collections.ConfigDict()
 
-    config.learning_rate = 0.001
-    config.latents = 30
-    config.hidden = 180
-    config.dropout_rate = 0.2
+    config.learning_rate = 0.000001
+    config.latents = 50
+    config.hidden = 380
+    config.dropout_rate = 0.1
     config.io_dim = 95
     config.epoch_size = 1000
-    config.num_epochs = 200
+    config.num_epochs = 100
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
-    config.checkpoint_restore_path = None
+    config.checkpoint_restore_path = ""
     return config
