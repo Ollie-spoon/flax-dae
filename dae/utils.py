@@ -29,8 +29,8 @@ import matplotlib.pyplot as plt
 import os
 from jax import devices
 import pickle
-import GPUtil
-import psutil
+# import GPUtil
+# import psutil
 
 def plot_comparison(comparison, epoch_number, save_location):
     fig, axes = plt.subplots(3, 2, figsize=(12, 18))
@@ -151,51 +151,51 @@ def __convert_to_path(string):
         return string.replace('/', '\\')
     raise ValueError("Input must be a string.")
 
-def __get_memory_size():
-    if devices()[0].device_kind == 'gpu':
-        # Get GPU memory size
-        gpus = GPUtil.getGPUs()
-        if gpus:
-            gpu = gpus[0]
-            return gpu.memoryTotal * 1024 ** 2 # This is in Bytes
-        else:
-            return ValueError("Jax identified a GPU, but none was found.")
-    else:
-        # Get CPU memory size
-        memory_info = psutil.virtual_memory()
-        return memory_info.total # This is in Bytes
+# def __get_memory_size():
+#     if devices()[0].device_kind == 'gpu':
+#         # Get GPU memory size
+#         gpus = GPUtil.getGPUs()
+#         if gpus:
+#             gpu = gpus[0]
+#             return gpu.memoryTotal * 1024 ** 2 # This is in Bytes
+#         else:
+#             return ValueError("Jax identified a GPU, but none was found.")
+#     else:
+#         # Get CPU memory size
+#         memory_info = psutil.virtual_memory()
+#         return memory_info.total # This is in Bytes
     
-def __calculate_memory_usage(length, dtype):
-    if dtype == jnp.float32:
-        bytes_per_element = 4
-    elif dtype == jnp.float64:
-        bytes_per_element = 8
-    else:
-        raise ValueError("Unsupported data type")
+# def __calculate_memory_usage(length, dtype):
+#     if dtype == jnp.float32:
+#         bytes_per_element = 4
+#     elif dtype == jnp.float64:
+#         bytes_per_element = 8
+#     else:
+#         raise ValueError("Unsupported data type")
     
-    total_bytes = length * bytes_per_element
-    return total_bytes
+#     total_bytes = length * bytes_per_element
+#     return total_bytes
 
-def calculate_batch_size(io_length, dtype, data_points_per_epoch):
-    memory_usage_per_data_point = __calculate_memory_usage(io_length, dtype)
-    print(f"\tmemory_usage_per_data_point: {memory_usage_per_data_point}")
-    allocated_memory = __get_memory_size()
-    print(f"\tallocated_memory: {allocated_memory}")
-    max_batch_size = allocated_memory // memory_usage_per_data_point
-    print(f"\tmax_batch_size: {max_batch_size}")
+# def calculate_batch_size(io_length, dtype, data_points_per_epoch):
+#     memory_usage_per_data_point = __calculate_memory_usage(io_length, dtype)
+#     print(f"\tmemory_usage_per_data_point: {memory_usage_per_data_point}")
+#     allocated_memory = __get_memory_size()
+#     print(f"\tallocated_memory: {allocated_memory}")
+#     max_batch_size = allocated_memory // memory_usage_per_data_point
+#     print(f"\tmax_batch_size: {max_batch_size}")
     
-    if data_points_per_epoch < max_batch_size:
-        return 1, data_points_per_epoch
-    for batches in range(1, max_batch_size+1):
-        if data_points_per_epoch/batches < max_batch_size:
-            break
-    if data_points_per_epoch % batches == 0:
-        return batches, data_points_per_epoch
-    for actual_points_per_epoch in range(1, data_points_per_epoch)[::-1]:
-        if actual_points_per_epoch % batches == 0:
-            return batches, actual_points_per_epoch
+#     if data_points_per_epoch < max_batch_size:
+#         return 1, data_points_per_epoch
+#     for batches in range(1, max_batch_size+1):
+#         if data_points_per_epoch/batches < max_batch_size:
+#             break
+#     if data_points_per_epoch % batches == 0:
+#         return batches, data_points_per_epoch
+#     for actual_points_per_epoch in range(1, data_points_per_epoch)[::-1]:
+#         if actual_points_per_epoch % batches == 0:
+#             return batches, actual_points_per_epoch
     
-    return ValueError("Batch size could not be calculated.")
+#     return ValueError("Batch size could not be calculated.")
 
 
 
