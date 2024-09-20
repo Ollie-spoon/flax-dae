@@ -151,6 +151,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     """Train and evaulate pipeline."""
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
+    time_keeping = time()
     rng = random.key(0)
     rng, init_rng = random.split(rng)
     
@@ -192,7 +193,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     
     
     batch_size = 500
-    config.epoch_size = 9500
+    config.epoch_size = 10000
     
     print(f"~~batch_size: {batch_size}")
     print(f"~~config.epoch_size: {config.epoch_size}")
@@ -210,7 +211,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
         # Restore the train state
         state = train_state.TrainState(
-            step=200*9500,  # Restore the step count from opt_state
+            step=100*10000,  # Restore the step count from opt_state
             apply_fn=models.model(**model_args).apply,
             params=params,
             tx=optax.adam(config.learning_rate),
@@ -230,6 +231,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         )
 
     metric_list = []
+    
+    print(f"time taken to")
     
     # Train the model
     for epoch in range(config.num_epochs):
