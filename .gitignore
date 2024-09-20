@@ -1,5 +1,6 @@
 tmp/
 dae/__pycache__/
+dae/config/__pycache__/
 *.png
 *.jpg
 *.pkl
