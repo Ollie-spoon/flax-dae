@@ -87,12 +87,12 @@ def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
     # log_mse_loss = get_log_mse_loss(recon_x, noiseless_x).mean()
     
     max_loss = get_max_loss(noisy_x+recon_diff, noiseless_x).mean()
-    # l2_loss = get_l2_loss(model_params)
+    l2_loss = get_l2_loss(model_params)
     # custom_loss = get_custom_loss(recon_diff, original_diff)
     
     # jax.debug.print("log_mse_loss: {}", log_mse_loss)
     
-    loss = mse_loss + max_loss# + l2_loss 
+    loss = mse_loss + max_loss + l2_loss 
     
     return {
         'mse': mse_loss, 
@@ -101,7 +101,7 @@ def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
         # 'log_mse': log_mse_loss, 
         'max': max_loss, 
         # 'custom': custom_loss, 
-        # 'l2': l2_loss, 
+        'l2': l2_loss, 
         'loss': loss
     }
 
@@ -129,7 +129,7 @@ def train_step(state, batch, model_args, dropout_rng):
 # Define the evaluation function
 def eval_f(params, batch, model_args):
     noisy_data, noiseless_data = batch
-    difference_data = noiseless_data - noisy_data
+    # difference_data = noiseless_data - noisy_data
     
     # print(f"jnp.shape(noisy_data): {jnp.shape(noisy_data)}")
     # print(f"jnp.shape(noiseless_data): {jnp.shape(noiseless_data)}")
@@ -153,7 +153,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
     rng = random.key(0)
-    rng, init_rng = random.split(rng)
+    rng, init_rng, io_rng = random.split(rng, 3)
     
     # Define the test data parameters
     data_args = {
@@ -172,15 +172,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "dtype": npfloat64,
     }
     
+    data_generator = input_pipeline.create_data_generator(data_args)
+    
     # Generate an example test data point to extract the input/output dimensions from
-    data_point_example = next(input_pipeline.generate_original_data(
-        iterations=1, 
-        train=False,
-        batch_size=1,
-        kwargs=data_args,
-    ))
+    data_point_example = next(data_generator(key=io_rng, n=1))
     io_dim = len(data_point_example[0][0])
     print(f"data_point_example[0].shape: {io_dim}")
+    
+    del io_rng, data_point_example
     
     # # Calculate the batch size based on the available memory and the maximum epoch size
     # batches, config.epoch_size = utils.calculate_batch_size(
@@ -191,11 +190,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # del data_point_example
     # batch_size = config.epoch_size // batches
     
-    
-    batch_size = 500
-    config.epoch_size = 10000
-    
-    print(f"~~batch_size: {batch_size}")
+    print(f"~~batch_size: {config.batch_size}")
     print(f"~~config.epoch_size: {config.epoch_size}")
     
     model_args = {
@@ -220,7 +215,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     else:
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
-        init_data = jnp.ones((batch_size, io_dim), data_args["dtype"])
+        init_data = jnp.ones((config.batch_size, io_dim), data_args["dtype"])
         params = models.model(**model_args).init(init_rng, init_data)['params']
 
         # Initialize the training state including the optimizer
@@ -229,6 +224,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             params=params,
             tx=optax.adam(config.learning_rate),
         )
+    
+    del init_rng
 
     metric_list = []
     
@@ -240,25 +237,22 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         start_time = time()
         
+        rng, train_rng, test_rng = random.split(rng, 3)
         # Create a training data set   
-        train_ds = input_pipeline.generate_original_data(
-            train=True,
-            iterations=config.epoch_size,
-            batch_size=batch_size,
-            kwargs=data_args,)
-        
-        # print(f"train_ds.shape: {train_ds.shape}")
+        train_ds = data_generator(
+            key=train_rng, 
+            n=config.epoch_size, 
+            batch_size=config.batch_size
+        )
         
         # Create a test data set 
-        test_batch = next(input_pipeline.generate_original_data(
-            train=False,
-            iterations=batch_size,
-            batch_size=batch_size,
-            kwargs=data_args,
-            ))
+        test_batch = next(data_generator(
+            key=test_rng, 
+            n=config.batch_size
+        ))
         
-        print(f"time taken to generate data: {time()-start_time:.3f}s")
-        time_keeping = time()
+        # print(f"time taken to generate data: {time()-start_time:.3f}s")
+        # time_keeping = time()
         
         # print(f"test_batch.shape: {len(test_batch)}")
         # print(f"test_batch[0].shape: {test_batch[0].shape}")
@@ -269,13 +263,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             rng, dropout_rng = random.split(rng)
             state = train_step(state, batch, model_args, dropout_rng)
         
-        print(f"time taken to train: {time()-time_keeping:.3f}s")
-        time_keeping = time()
+        # print(f"time taken to train: {time()-time_keeping:.3f}s")
+        # time_keeping = time()
 
         # Evaluate the model
         metrics, comparison = eval_f(state.params, test_batch, model_args)
         
-        print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
+        # print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
         
         # print(f"metrics: {metrics}")
         # print(f"comparison: {comparison}")
@@ -291,7 +285,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             f"max: {metrics['max']:.5f}, "
             # f"huber: {metrics['huber']:.8f}, "
             # f"log_mse: {metrics['log_mse']:.8f}, "
-            # f"l2: {metrics['l2']:.8f}"
+            f"l2: {metrics['l2']:.8f}"
         )
         
         # Save the model
@@ -364,3 +358,58 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 # eval epoch: 178, time 3.18s, loss: 0.0263191, mse: 0.00009616, max: 0.02595128, l2: 0.00027163
 # eval epoch: 179, time 3.28s, loss: 0.0271828, mse: 0.00010563, max: 0.02680554, l2: 0.00027159
 # eval epoch: 180, time 3.22s, loss: 0.0265318, mse: 0.00009949, max: 0.02616112, l2: 0.00027121
+
+# Initial 20 epochs with 0.002 learning rate with only 1 hidden layer 95:380:50
+# eval epoch: 1, time 6.40s, loss: 0.0686198, mse: 0.0007613381, max: 0.06786, l2: 0.00000071
+# eval epoch: 2, time 2.21s, loss: 0.0315773, mse: 0.0001410900, max: 0.03144, l2: 0.00000071
+# eval epoch: 3, time 2.19s, loss: 0.0296443, mse: 0.0001283213, max: 0.02952, l2: 0.00000070
+# eval epoch: 4, time 2.18s, loss: 0.0287801, mse: 0.0001200374, max: 0.02866, l2: 0.00000070
+# eval epoch: 5, time 2.18s, loss: 0.0276918, mse: 0.0001172707, max: 0.02757, l2: 0.00000069
+# eval epoch: 6, time 2.35s, loss: 0.0279019, mse: 0.0001155628, max: 0.02779, l2: 0.00000069
+# eval epoch: 7, time 2.26s, loss: 0.0277906, mse: 0.0001135420, max: 0.02768, l2: 0.00000069
+# eval epoch: 8, time 2.19s, loss: 0.0275679, mse: 0.0001127483, max: 0.02746, l2: 0.00000068
+# eval epoch: 9, time 2.21s, loss: 0.0271378, mse: 0.0001120558, max: 0.02703, l2: 0.00000068
+# eval epoch: 10, time 2.18s, loss: 0.0276028, mse: 0.0001147511, max: 0.02749, l2: 0.00000068
+# eval epoch: 11, time 2.23s, loss: 0.0271092, mse: 0.0001085477, max: 0.02700, l2: 0.00000068
+# eval epoch: 12, time 2.21s, loss: 0.0273182, mse: 0.0001106180, max: 0.02721, l2: 0.00000068
+# eval epoch: 13, time 2.23s, loss: 0.0271339, mse: 0.0001108885, max: 0.02702, l2: 0.00000068
+# eval epoch: 14, time 2.19s, loss: 0.0270930, mse: 0.0001076422, max: 0.02699, l2: 0.00000068
+# eval epoch: 15, time 2.23s, loss: 0.0275015, mse: 0.0001079853, max: 0.02739, l2: 0.00000067
+# eval epoch: 16, time 2.23s, loss: 0.0268886, mse: 0.0001065150, max: 0.02678, l2: 0.00000067
+# eval epoch: 17, time 2.23s, loss: 0.0271248, mse: 0.0001074637, max: 0.02702, l2: 0.00000067
+# eval epoch: 18, time 2.19s, loss: 0.0270350, mse: 0.0001092915, max: 0.02693, l2: 0.00000067
+# eval epoch: 19, time 2.33s, loss: 0.0269516, mse: 0.0001038134, max: 0.02685, l2: 0.00000067
+# eval epoch: 20, time 2.30s, loss: 0.0275775, mse: 0.0001118066, max: 0.02747, l2: 0.00000067
+
+# Continued with a 10th of the learning rate
+
+# eval epoch: 1, time 8.58s, loss: 0.0264469, mse: 0.0001010960, max: 0.02635, l2: 0.00000067
+# eval epoch: 2, time 2.48s, loss: 0.0262269, mse: 0.0000987375, max: 0.02613, l2: 0.00000067
+# eval epoch: 3, time 2.73s, loss: 0.0264717, mse: 0.0001022424, max: 0.02637, l2: 0.00000067
+# eval epoch: 4, time 2.84s, loss: 0.0267135, mse: 0.0001000851, max: 0.02661, l2: 0.00000067
+# eval epoch: 5, time 2.47s, loss: 0.0259943, mse: 0.0001003670, max: 0.02589, l2: 0.00000067
+# eval epoch: 6, time 2.48s, loss: 0.0261110, mse: 0.0000983344, max: 0.02601, l2: 0.00000067
+# eval epoch: 7, time 2.60s, loss: 0.0260025, mse: 0.0000977995, max: 0.02590, l2: 0.00000067
+# eval epoch: 8, time 2.55s, loss: 0.0262142, mse: 0.0000978893, max: 0.02612, l2: 0.00000067
+# eval epoch: 9, time 2.46s, loss: 0.0258707, mse: 0.0000981567, max: 0.02577, l2: 0.00000067
+# eval epoch: 10, time 2.46s, loss: 0.0264305, mse: 0.0001006367, max: 0.02633, l2: 0.00000067
+# eval epoch: 11, time 2.47s, loss: 0.0261005, mse: 0.0000964193, max: 0.02600, l2: 0.00000067
+# eval epoch: 12, time 2.56s, loss: 0.0260889, mse: 0.0000985223, max: 0.02599, l2: 0.00000067
+# eval epoch: 13, time 2.62s, loss: 0.0259972, mse: 0.0000968078, max: 0.02590, l2: 0.00000067
+# eval epoch: 14, time 2.85s, loss: 0.0261861, mse: 0.0000972415, max: 0.02609, l2: 0.00000067
+# eval epoch: 15, time 2.32s, loss: 0.0264188, mse: 0.0000976527, max: 0.02632, l2: 0.00000067
+# eval epoch: 16, time 2.29s, loss: 0.0262123, mse: 0.0000977814, max: 0.02611, l2: 0.00000067
+# eval epoch: 17, time 2.22s, loss: 0.0261200, mse: 0.0000970996, max: 0.02602, l2: 0.00000067
+# eval epoch: 18, time 2.30s, loss: 0.0260109, mse: 0.0001013300, max: 0.02591, l2: 0.00000067
+# eval epoch: 19, time 2.24s, loss: 0.0261549, mse: 0.0000968106, max: 0.02606, l2: 0.00000067
+# eval epoch: 20, time 2.34s, loss: 0.0261016, mse: 0.0000974375, max: 0.02600, l2: 0.00000067
+
+# at 0.00004 after 80 epochs we get to just dancing about the threshold from 0.00008 to 0.00007 so
+# 0.00001: Essentially no change. individual shifts between epochs were large, but no meta-improvement
+# 0.00002: 0.000080-0.000083
+# 0.00004: 0.000079-0.000081
+# 0.00008: 0.000074-0.000077
+# 0.00016: 0.000068-0.000071
+# 0.00032: 0.000068-0.000072
+# 0.00064: immediately jumps out of the minimum but then starts learning really fast but keeps jumping out.
+# 0.00128: jumps out, 
