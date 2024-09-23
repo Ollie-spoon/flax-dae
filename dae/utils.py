@@ -81,16 +81,17 @@ def plot_inverse_loss(metric_list, save_path):
 
     # Plot the inverse of each loss component
     for key in keys:
-        loss_values = jnp.array([metric[key] for metric in metric_list])
-        ax.plot(1/loss_values, label=key)
+        if key == "mse":
+            loss_values = jnp.array([metric[key] for metric in metric_list])
+            ax.plot(1/loss_values, label=key)
 
     # Set the x-axis label
     ax.set_xlabel('Time')
-    ax.set_xscale('log')
+    # ax.set_xscale('log')
 
     # Set the y-axis label
     ax.set_ylabel('Accuracy (Inverse of the Loss)')
-    ax.set_yscale('log')
+    # ax.set_yscale('log')
 
     # Add a legend
     ax.legend()
