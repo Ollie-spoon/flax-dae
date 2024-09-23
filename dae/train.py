@@ -1,16 +1,3 @@
-# Copyright 2023 The Flax Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """Training and evaluation logic."""
 
 from absl import logging
@@ -39,8 +26,8 @@ def abs_complex_log10(numbers):
     return jnp.log10(absolutes)+negative
 
 @jax.vmap
-def get_mse_loss(recon_x, noiseless_x):
-    return jnp.mean(jnp.square(recon_x - noiseless_x))
+def get_mse_loss(recon_x, noiseless_x, scale=8737.09465):
+    return jnp.mean(jnp.square(recon_x - noiseless_x)) * scale
 
 @jax.vmap
 def get_mae_loss(recon_x, noiseless_x):
@@ -63,11 +50,11 @@ def get_log_mse_loss(recon_x, noiseless_x, eps=1e-16):
     return jnp.square(abs_complex_log10(recon_x+eps) - abs_complex_log10(noiseless_x+eps)).mean()
 
 @jax.vmap
-def get_max_loss(recon_x, noiseless_x):
-    return jnp.max(jnp.abs(recon_x - noiseless_x))
+def get_max_loss(recon_x, noiseless_x, scale=10):
+    return jnp.max(jnp.abs(recon_x - noiseless_x))*10
 
 @jax.jit
-def get_l2_loss(params, alpha=0.00002):
+def get_l2_loss(params, alpha=0.0002):
     l2_loss = jax.tree_util.tree_map(lambda x: jnp.mean(jnp.square(x)), params)
     return alpha * sum(jax.tree_util.tree_leaves(l2_loss))
 
@@ -171,6 +158,22 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "wavelet": "coif6", 
         "dtype": npfloat64,
     }
+    
+    # data_args = {
+    #     "params": {
+    #         "a1": 0.6, 
+    #         "a2": 0.4, 
+    #         "tau1_min": 30, 
+    #         "tau1_max": 50, 
+    #         "tau2_min": 100, 
+    #         "tau2_max": 140,
+    #     },
+    #     "t_max": 480, 
+    #     "t_len": 1000, 
+    #     "SNR": 100,
+    #     "wavelet": "coif6", 
+    #     "dtype": npfloat64,
+    # }
     
     data_generator = input_pipeline.create_data_generator(data_args)
     

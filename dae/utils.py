@@ -81,7 +81,7 @@ def plot_inverse_loss(metric_list, save_path):
 
     # Plot the inverse of each loss component
     for key in keys:
-        if key == "mse":
+        if key != "l2":
             loss_values = jnp.array([metric[key] for metric in metric_list])
             ax.plot(1/loss_values, label=key)
 
