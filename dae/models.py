@@ -1,24 +1,10 @@
-# Copyright 2024 The Flax Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""VAE model definitions."""
+"""DAE model definitions."""
 
 from flax import linen as nn
 
 
 class Encoder(nn.Module):
-  """VAE Encoder."""
+  """DAE Encoder."""
 
   latents: int
   hidden: int
@@ -26,31 +12,49 @@ class Encoder(nn.Module):
 
   @nn.compact
   def __call__(self, x, deterministic):
+    
+    # Hidden layer 1  (io_dim -> hidden)
     x = nn.Dense(self.hidden, name='fc1')(x)
     x = nn.gelu(x)
     x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
-    x = nn.Dense(self.latents, name='fc2_mean')(x)
+    
+    # # Hidden layer 2  (hidden -> hidden)
+    # x = nn.Dense(self.hidden, name='fc2')(x)
+    # x = nn.gelu(x)
+    # x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
+    
+    # Latent layer  (hidden -> latent)
+    x = nn.Dense(self.latents, name='fc3')(x)
     return x
 
 
 class Decoder(nn.Module):
-  """VAE Decoder."""
-  
-  hidden: int
-  dropout_rate: float
-  io_dim: int
+    """DAE Decoder."""
 
-  @nn.compact
-  def __call__(self, z, deterministic):
-    z = nn.Dense(self.hidden, name='fc1')(z)
-    z = nn.gelu(z)
-    z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
-    z = nn.Dense(self.io_dim, name='fc2')(z)
-    return z
+    hidden: int
+    dropout_rate: float
+    io_dim: int
+
+    @nn.compact
+    def __call__(self, z, deterministic):
+        
+        # Hidden layer 1  (latent -> hidden)
+        z = nn.Dense(self.hidden, name='fc1')(z)
+        z = nn.gelu(z)
+        z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
+
+        # # Hidden layer 2  (hidden -> hidden)
+        # z = nn.Dense(self.hidden, name='fc2')(z)
+        # z = nn.gelu(z)
+        # z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
+
+        # Output layer  (hidden -> io_dim)
+        z = nn.Dense(self.io_dim, name='fc3')(z)
+        return z
 
 
 class DAE(nn.Module):
-    """Full VAE model."""
+    """Full DAE model."""
 
     latents: int
     hidden: int
@@ -74,10 +78,6 @@ class DAE(nn.Module):
         z = reparameterize(x) # used to be random for vae: reparameterize(x, z_rng)
         recon_x = self.decoder(z, deterministic)
         return recon_x
-
-    # Generate samples from the VAE using latents as input
-    def generate(self, z):
-        return nn.sigmoid(self.decoder(z))
 
 # Currently does nothing but can be used to reparameterize the latents
 def reparameterize(x):

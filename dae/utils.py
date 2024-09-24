@@ -1,23 +1,3 @@
-# Copyright 2023 The Flax Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-This code is created with reference to torchvision/utils.py.
-
-Modify: torch.tensor -> jax.numpy.DeviceArray
-If you want to know about this file in detail, please visit the original code:
-    https://github.com/pytorch/vision/blob/master/torchvision/utils.py
-"""
 # import math
 
 # import numpy as np
@@ -27,7 +7,7 @@ If you want to know about this file in detail, please visit the original code:
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import os
-from jax import devices
+# from jax import devices
 import pickle
 # import GPUtil
 # import psutil
@@ -81,16 +61,17 @@ def plot_inverse_loss(metric_list, save_path):
 
     # Plot the inverse of each loss component
     for key in keys:
-        loss_values = jnp.array([metric[key] for metric in metric_list])
-        ax.plot(1/loss_values, label=key)
+        if key != "l2":
+            loss_values = jnp.array([metric[key] for metric in metric_list])
+            ax.plot(loss_values, label=key)
 
     # Set the x-axis label
     ax.set_xlabel('Time')
-    ax.set_xscale('log')
+    # ax.set_xscale('log')
 
     # Set the y-axis label
     ax.set_ylabel('Accuracy (Inverse of the Loss)')
-    ax.set_yscale('log')
+    # ax.set_yscale('log')
 
     # Add a legend
     ax.legend()

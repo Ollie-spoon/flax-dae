@@ -24,7 +24,6 @@ from absl import logging
 from clu import platform
 import jax
 from ml_collections import config_flags
-import tensorflow as tf
 
 import train
 
@@ -43,24 +42,24 @@ config_flags.DEFINE_config_file(
 
 
 def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Too many command-line arguments.')
+    if len(argv) > 1:
+        raise app.UsageError('Too many command-line arguments.')
 
-  # Make sure tf does not allocate gpu memory.
-  tf.config.experimental.set_visible_devices([], 'GPU')
+    # # Make sure tf does not allocate gpu memory.
+    # tf.config.experimental.set_visible_devices([], 'GPU')
 
-  # Log some information about the JAX environment.
-  logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
-  logging.info('JAX local devices: %r', jax.local_devices())
+    # Log some information about the JAX environment.
+    logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
+    logging.info('JAX local devices: %r', jax.local_devices())
 
-  # Add a note so that we can tell which task is which JAX host.
-  # (Depending on the platform task 0 is not guaranteed to be host 0)
-  platform.work_unit().set_task_status(
-      f'process_index: {jax.process_index()}, '
-      f'process_count: {jax.process_count()}'
-  )
+    # Add a note so that we can tell which task is which JAX host.
+    # (Depending on the platform task 0 is not guaranteed to be host 0)
+    platform.work_unit().set_task_status(
+        f'process_index: {jax.process_index()}, '
+        f'process_count: {jax.process_count()}'
+    )
 
-  train.train_and_evaluate(FLAGS.config, FLAGS.working_dir)
+    train.train_and_evaluate(FLAGS.config, FLAGS.working_dir)
 
 
 if __name__ == '__main__':
