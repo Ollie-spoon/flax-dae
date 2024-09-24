@@ -18,15 +18,8 @@ def create_data_generator(kwargs):
         # Generate the full dataset in one go
         data = generate_data(key, n)
         
-        # print(f"data.len: {len(data)}")
-        # print(f"data[0].shape: {data[0].shape}")
-        # print(f"data[1].shape: {data[1].shape}")
-        
-        # noisy_data = data[0][:, 0, :]  # Noisy version
-        # noiseless_data = data[1][:, 0, :]  # Noiseless version
-        
-        noisy_data = data[0]  # Noisy version
-        noiseless_data = data[1]  # Noiseless version
+        noisy_approx = data[0]  # Noisy version of the approximation coefficient
+        clean_signal = data[1]  # Noiseless version in the time domain
         
         if batch_size is None:
             batch_size = n  # Default batch size is all data
@@ -38,12 +31,12 @@ def create_data_generator(kwargs):
             num_batches = n // batch_size
         
         # Reshape the data into batches
-        noisy_data_batched = noisy_data.reshape((num_batches, batch_size, *noisy_data.shape[1:]))
-        noiseless_data_batched = noiseless_data.reshape((num_batches, batch_size, *noiseless_data.shape[1:]))
+        noisy_approx_batched = noisy_approx.reshape((num_batches, batch_size, *noisy_approx.shape[1:]))
+        clean_signal_batched = clean_signal.reshape((num_batches, batch_size, *clean_signal.shape[1:]))
         
         def batch_iterator():
             for i in range(num_batches):
-                yield noisy_data_batched[i], noiseless_data_batched[i]
+                yield noisy_approx_batched[i], clean_signal_batched[i]
         
         return batch_iterator()
     

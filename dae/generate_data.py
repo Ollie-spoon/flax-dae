@@ -9,10 +9,10 @@ def create_multi_exponential_decay(t):
         return decay
     return jax.jit(multi_exponential_decay)
 
-def create_wavelet_decomposition(wavelet):
+def create_wavelet_decomposition(wavelet, mode='symmetric'):
     def wavelet_decomposition(data):
-        approximation_coeffs = wavedec(data=data, wavelet=wavelet, mode='symmetric')[0]
-        return approximation_coeffs
+        coeffs = wavedec(data=data, wavelet=wavelet, mode=mode)
+        return coeffs
     return jax.jit(wavelet_decomposition)
 
 # JIT compile and parallelize single data generation
@@ -26,12 +26,13 @@ def create_generate_single_data(t, noise_power, wavelet):
     def generate_single_data(key, params):
         decay_truth = multi_exponential_decay(params)
         noisy_signal = decay_truth + noise_power * jax.random.normal(key, shape=t.shape)
+        # noisy_signal = decay_truth + noise_power * jax.random.laplace(key, shape=t.shape)
+        # noisy_signal = decay_truth + noise_power * jax.random.cauchy(key, shape=t.shape)
 
         # Perform wavelet decomposition
-        noisy_coeffs = wavelet_decomposition(noisy_signal)
-        clean_coeffs = wavelet_decomposition(decay_truth)
+        noisy_coeffs = wavelet_decomposition(noisy_signal)[0]
 
-        return noisy_coeffs, clean_coeffs
+        return noisy_coeffs, decay_truth
     
     return generate_single_data
 
