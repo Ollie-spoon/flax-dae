@@ -1,21 +1,22 @@
 """Training and evaluation logic."""
 
 from absl import logging
+import jax
+jax.config.update("jax_enable_x64", True)
+from jax import random
+import jax.numpy as jnp
 from flax import linen as nn
+from flax.training import train_state
+import ml_collections
+from time import time
+from numpy import float64 as npfloat64
+
+import optax
 import input_pipeline
 import models
 import utils
 import data_processing
 from loss import compute_metrics, new_metrics
-from flax.training import train_state
-import jax
-jax.config.update("jax_enable_x64", True)
-from jax import random
-import jax.numpy as jnp
-import ml_collections
-import optax
-from time import time
-from numpy import float64 as npfloat64
 
 # Define the training step
 def create_train_step(model_args):

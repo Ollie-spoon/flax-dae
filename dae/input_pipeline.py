@@ -2,13 +2,9 @@
 
 import jax
 import jax.numpy as jnp
-import tensorflow as tf
-import tensorflow_datasets as tfds
 from generate_data import create_generate_basic_data
 from typing import Union
-
 import jax.numpy as jnp
-import jax
 
 def create_data_generator(kwargs):
     generate_data = create_generate_basic_data(**kwargs)
