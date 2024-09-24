@@ -1,4 +1,6 @@
+import jax
 import jax.numpy as jnp
+jax.config.update("jax_enable_x64", True)
 from jax.random import uniform, normal, split, key
 from cr.wavelets import wavedec, waverec
 import pickle
@@ -89,7 +91,7 @@ def model(latents, hidden, dropout_rate, io_dim):
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2024)
+    rng = key(2025)
     rng, key1, key2, key3 = split(rng, 4)
     
     t = jnp.linspace(0, 100, 1000)
@@ -99,7 +101,8 @@ def denoise_bi_exponential():
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
 
     # Add Gaussian noise
-    noise_scale = 1/100
+    SNR = 200
+    noise_scale = 1/SNR
     noise = noise_scale * normal(key3, shape=t.shape)
     noisy_decay = decay + noise
 
@@ -128,14 +131,15 @@ def denoise_bi_exponential():
 
     # Inverse wavelet decomposition with denoised approximation coefficients
     plt.title("Comparison of noisy and denoised approximation coefficients.")
-    plt.plot(coeffs[0], label='Noisy')
+    # plt.plot(coeffs[0], label='Noisy')
     noisy_approx = coeffs[0]
     coeffs[0] += denoised_approx_coeffs
-    plt.plot(coeffs[0], label='Denoised')
-    plt.xlabel("index")
-    plt.ylabel("coefficient amplitude")
-    plt.legend()
-    plt.show()
+    # plt.plot(coeffs[0], label='Denoised')
+    # plt.plot(jnp.log10(clean_approx), label='Clean')
+    # plt.xlabel("index")
+    # plt.ylabel("coefficient amplitude")
+    # plt.legend()
+    # plt.show()
     
     denoised_decay = waverec(coeffs, wavelet, mode=mode)
     coeffs_clean[0] = noisy_approx
@@ -149,23 +153,23 @@ def denoise_bi_exponential():
     print(f"The mse loss for the noisy signal was {get_mse_loss(noisy_approx, clean_approx)}")
     print(f"The mse loss for the denoised signal was {get_mse_loss(coeffs[0], clean_approx)}")
 
-    # Plot comparison
-    plt.title("Comparison of noisy and denoised signals")
-    plt.plot(t, noisy_decay - decay, label='Noisy')
-    plt.plot(t, denoised_decay - decay, label='Denoised')
-    plt.xlabel("time (ms)")
-    plt.ylabel("signal amplitude")
-    plt.legend()
-    plt.show()
+    # # Plot comparison
+    # plt.title("Comparison of noisy and denoised signals")
+    # plt.plot(t, noisy_decay - decay, label='Noisy')
+    # plt.plot(t, denoised_decay - decay, label='Denoised')
+    # plt.xlabel("time (ms)")
+    # plt.ylabel("signal amplitude")
+    # plt.legend()
+    # plt.show()
     
-    plt.title("Comparison of noisy and denoised approximation coefficient injections")
-    plt.plot(t, noisy_decay - decay, label='Noisy')
-    plt.plot(t, injected_original - decay, label='Noisy Injected')
-    plt.plot(t, injected_denoised - decay, label='Denoised Injected')
-    plt.xlabel("time (ms)")
-    plt.ylabel("signal noise amplitude")
-    plt.legend()
-    plt.show()
+    # plt.title("Comparison of noisy and denoised approximation coefficient injections")
+    # plt.plot(t, noisy_decay - decay, label='Noisy')
+    # plt.plot(t, injected_original - decay, label='Noisy Injected')
+    # plt.plot(t, injected_denoised - decay, label='Denoised Injected')
+    # plt.xlabel("time (ms)")
+    # plt.ylabel("signal noise amplitude")
+    # plt.legend()
+    # plt.show()
     
     # For this section we are going to test out some interesting things
     
@@ -173,7 +177,19 @@ def denoise_bi_exponential():
     # Is this data lost?
     
     # coeffs_clean[0] = clean_approx
-    # reconstructed_clean = waverec(coeffs_clean, wavelet, mode=mode)
+    # # coeffs_clean[0][:10] = noisy_approx[:10]
+    # for i in range(1,21):
+    #     coeffs_clean[0] = coeffs_clean[0].at[-i:].set(noisy_approx[-i:])
+    #     reconstructed_clean = waverec(coeffs_clean, wavelet, mode=mode)
+        
+    #     # plt.plot(t, decay, label="original")
+    #     # plt.plot(t, reconstructed_clean, label="Reconstructed")
+    #     # plt.legend()
+    #     # plt.show()
+        
+    #     plt.title(f"for changing the last {i} values")
+    #     plt.plot(t, decay-reconstructed_clean)
+    #     plt.show()
 
 def get_mse_loss(recon_x, noiseless_x):
     return jnp.mean(jnp.square(recon_x - noiseless_x))
