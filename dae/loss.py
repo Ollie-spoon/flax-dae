@@ -99,7 +99,7 @@ def new_metrics(recon_diff, clean_signal, model_params):
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
     metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
-    metrics["l2"] = get_l2_loss(model_params)
+    # metrics["l2"] = get_l2_loss(model_params)
     
     # for key, value in metrics.items():
     #     # print(f"{key}: {value}")

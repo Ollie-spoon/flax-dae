@@ -129,7 +129,7 @@ def load_model(ckpt_path: str):
 
 def __convert_to_path(string):
     if isinstance(string, str):
-        return string.replace('/', '\\')
+        return string.replace('\\', '/')
     raise ValueError("Input must be a string.")
 
 # def __get_memory_size():
