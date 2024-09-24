@@ -26,7 +26,7 @@ def create_train_step(model_args):
         noisy_approx, clean_signal = batch
         
         def loss_fn(params):
-            difference_prediction = models.model(
+            prediction = models.model(
                 hidden=model_args["hidden"],
                 latents=model_args["latents"],
                 dropout_rate=model_args["dropout_rate"],
@@ -39,7 +39,7 @@ def create_train_step(model_args):
             )
 
             # loss = compute_metrics(difference_prediction, noiseless_data, noisy_approx, state.params)['loss']
-            loss = new_metrics(difference_prediction, noisy_approx, clean_signal, params)["loss"]
+            loss = new_metrics(prediction, clean_signal, params)["loss"]
             return loss
 
         grads = jax.grad(loss_fn)(state.params)
@@ -55,13 +55,13 @@ def create_eval_f(model_args):
         noisy_approx, clean_signal = batch
         
         def eval_model(vae):
-            difference_prediction = vae(noisy_approx, deterministic=True)
+            prediction = vae(noisy_approx, deterministic=True)
             
             # Why is this in the eval_model function?
             # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
             
             # metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
-            metrics = new_metrics(difference_prediction, noisy_approx, clean_signal, params)
+            metrics = new_metrics(prediction, clean_signal, params)
             return metrics#, comparison
 
         return nn.apply(eval_model, models.model(
@@ -233,20 +233,21 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         metric_list.append(metrics)
 
         # Print the evaluation metrics
-        print(
-            f"eval epoch: {epoch + 1}, "
-            f"time {time()-start_time:.2f}s, "
-            f"loss: {metrics['loss']:.7f}, "
-            f"mse: {metrics['mse']:.10f}, "
-            # f"mae: {metrics['mae']:.8f}, "
-            f"max: {metrics['max']:.5f}, "
-            # f"huber: {metrics['huber']:.8f}, "
-            # f"log_mse: {metrics['log_mse']:.8f}, "
-            # f"l2: {metrics['l2']:.8f}"
-        )
+        if (epoch + 1) % 20 == 0:
+            print(
+                f"eval epoch: {epoch + 1}, "
+                f"time {time()-start_time:.2f}s, "
+                f"loss: {metrics['loss']:.7f}, "
+                f"mse: {metrics['mse']:.10f}, "
+                # f"mae: {metrics['mae']:.8f}, "
+                f"max: {metrics['max']:.5f}, "
+                # f"huber: {metrics['huber']:.8f}, "
+                # f"log_mse: {metrics['log_mse']:.8f}, "
+                f"l2: {metrics['l2']:.8f}"
+            )
         
         # Save the model
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 250 == 0:
             utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
             # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             

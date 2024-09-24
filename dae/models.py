@@ -18,10 +18,10 @@ class Encoder(nn.Module):
     x = nn.gelu(x)
     x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     
-    # # Hidden layer 2  (hidden -> hidden)
-    # x = nn.Dense(self.hidden, name='fc2')(x)
-    # x = nn.gelu(x)
-    # x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
+    # Hidden layer 2  (hidden -> hidden)
+    x = nn.Dense(self.hidden, name='fc2')(x)
+    x = nn.gelu(x)
+    x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     
     # Latent layer  (hidden -> latent)
     x = nn.Dense(self.latents, name='fc3')(x)
@@ -43,10 +43,10 @@ class Decoder(nn.Module):
         z = nn.gelu(z)
         z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
 
-        # # Hidden layer 2  (hidden -> hidden)
-        # z = nn.Dense(self.hidden, name='fc2')(z)
-        # z = nn.gelu(z)
-        # z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
+        # Hidden layer 2  (hidden -> hidden)
+        z = nn.Dense(self.hidden, name='fc2')(z)
+        z = nn.gelu(z)
+        z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
 
         # Output layer  (hidden -> io_dim)
         z = nn.Dense(self.io_dim, name='fc3')(z)

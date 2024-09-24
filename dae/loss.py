@@ -46,7 +46,7 @@ def get_max_loss(recon_x, noiseless_x, scale=72.51828996):
     return jnp.max(jnp.abs(recon_x - noiseless_x))*scale
 
 @jit
-def get_l2_loss(params, alpha=0.00000002):
+def get_l2_loss(params, alpha=0.00000001):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
     return alpha * sum(tree_util.tree_leaves(l2_loss))
 
@@ -73,13 +73,13 @@ def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
 
 @vmap
 @jit
-def noise_injection(recon_diff, noisy_approx, clean_signal):
+def noise_injection(recon_diff, clean_signal):
     
     # forward wavelet transform
     clean_coeffs = wavedec(clean_signal, "coif6", mode="symmetric")
     
     # Noise injection
-    clean_coeffs[0] = noisy_approx + recon_diff
+    clean_coeffs[0] = recon_diff
     
     # inverse wavelet transform
     injected_denoised = waverec(clean_coeffs, "coif6", mode="symmetric")
@@ -88,10 +88,10 @@ def noise_injection(recon_diff, noisy_approx, clean_signal):
 
 # Combine the loss functions into a single value
 @jit
-def new_metrics(recon_diff, noisy_approx, clean_signal, model_params):
+def new_metrics(recon_diff, clean_signal, model_params):
     
     # Noise injection/preprocessing
-    injected_denoised = noise_injection(recon_diff, noisy_approx, clean_signal)
+    injected_denoised = noise_injection(recon_diff, clean_signal)
     
     # calculating losses    
     metrics = {}
@@ -99,7 +99,7 @@ def new_metrics(recon_diff, noisy_approx, clean_signal, model_params):
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
     metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
-    # metrics["l2"] = get_l2_loss(model_params)
+    metrics["l2"] = get_l2_loss(model_params)
     
     # for key, value in metrics.items():
     #     # print(f"{key}: {value}")
