@@ -6,6 +6,7 @@ import input_pipeline
 import models
 import utils
 import data_processing
+from loss import compute_metrics, new_metrics
 from flax.training import train_state
 import jax
 jax.config.update("jax_enable_x64", True)
@@ -16,122 +17,59 @@ import optax
 from time import time
 from numpy import float64 as npfloat64
 
-
-@jax.jit
-def abs_complex_log10(numbers):
-    # Compute the complex logarithm
-    absolutes = jnp.abs(numbers)  # Adding 0j to ensure complex type
-    negative = (1-numbers/absolutes)
-    # Return the absolute value of the complex logarithm
-    return jnp.log10(absolutes)+negative
-
-@jax.vmap
-def get_mse_loss(recon_x, noiseless_x, scale=8737.09465):
-    return jnp.mean(jnp.square(recon_x - noiseless_x)) * scale
-
-@jax.vmap
-def get_mae_loss(recon_x, noiseless_x):
-    return jnp.mean(jnp.abs(recon_x - noiseless_x))
-
-@jax.jit
-def huber_loss(recon_x, noiseless_x, delta=1.0):
-    diff = recon_x - noiseless_x
-    abs_diff = jnp.abs(diff)
-    quadratic = jnp.minimum(abs_diff, delta)
-    linear = abs_diff - quadratic
-    return 0.5 * quadratic**2 + delta * linear
-
-@jax.vmap
-def get_huber_loss(recon_x, noiseless_x, delta=1.0):
-    return jnp.mean(huber_loss(recon_x, noiseless_x, delta))
-
-@jax.vmap
-def get_log_mse_loss(recon_x, noiseless_x, eps=1e-16):
-    return jnp.square(abs_complex_log10(recon_x+eps) - abs_complex_log10(noiseless_x+eps)).mean()
-
-@jax.vmap
-def get_max_loss(recon_x, noiseless_x, scale=10):
-    return jnp.max(jnp.abs(recon_x - noiseless_x))*10
-
-@jax.jit
-def get_l2_loss(params, alpha=0.0002):
-    l2_loss = jax.tree_util.tree_map(lambda x: jnp.mean(jnp.square(x)), params)
-    return alpha * sum(jax.tree_util.tree_leaves(l2_loss))
-
-@jax.jit
-def get_custom_loss(recon_diff, original_diff, alpha=0.002):
-    return alpha * jnp.max([0, 1 - recon_diff/original_diff]).mean()
-
-# Combine the loss functions into a single value
-def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
-    original_diff = noiseless_x - noisy_x 
-    mse_loss = get_mse_loss(recon_diff, original_diff).mean()
-    # mae_loss = get_mae_loss(recon_x, noiseless_x).mean()
-    # huber_loss = get_huber_loss(recon_x, noiseless_x).mean()
-    # print(f"mse_loss: {mse_loss}")
-    
-    # handle nan values
-    # log_mse_loss = get_log_mse_loss(recon_x, noiseless_x).mean()
-    
-    max_loss = get_max_loss(noisy_x+recon_diff, noiseless_x).mean()
-    l2_loss = get_l2_loss(model_params)
-    # custom_loss = get_custom_loss(recon_diff, original_diff)
-    
-    # jax.debug.print("log_mse_loss: {}", log_mse_loss)
-    
-    loss = mse_loss + max_loss + l2_loss 
-    
-    return {
-        'mse': mse_loss, 
-        # 'mae': mae_loss, 
-        # 'huber': huber_loss, 
-        # 'log_mse': log_mse_loss, 
-        'max': max_loss, 
-        # 'custom': custom_loss, 
-        'l2': l2_loss, 
-        'loss': loss
-    }
-
-
 # Define the training step
-def train_step(state, batch, model_args, dropout_rng):
-    noisy_data, noiseless_data = batch
-    # difference_data = noiseless_data - noisy_data
-    
-    def loss_fn(params):
-        difference_prediction = models.model(**model_args).apply(
-            {'params': params},
-            x=noisy_data,
-            deterministic=False,
-            rngs={'dropout': dropout_rng},
-        )
+def create_train_step(model_args):
 
-        loss = compute_metrics(difference_prediction, noiseless_data, noisy_data, state.params)['loss']
-        return loss
+    @jax.jit
+    def train_step(state, batch, dropout_rng):
+        noisy_approx, clean_signal = batch
+        
+        def loss_fn(params):
+            difference_prediction = models.model(
+                hidden=model_args["hidden"],
+                latents=model_args["latents"],
+                dropout_rate=model_args["dropout_rate"],
+                io_dim=model_args["io_dim"],
+            ).apply(
+                {'params': params},
+                x=noisy_approx,
+                deterministic=False,
+                rngs={'dropout': dropout_rng},
+            )
 
-    grads = jax.grad(loss_fn)(state.params)
-    return state.apply_gradients(grads=grads)
+            # loss = compute_metrics(difference_prediction, noiseless_data, noisy_approx, state.params)['loss']
+            loss = new_metrics(difference_prediction, noisy_approx, clean_signal, params)["loss"]
+            return loss
+
+        grads = jax.grad(loss_fn)(state.params)
+        return state.apply_gradients(grads=grads)
+    return train_step
 
 
 # Define the evaluation function
-def eval_f(params, batch, model_args):
-    noisy_data, noiseless_data = batch
-    # difference_data = noiseless_data - noisy_data
+def create_eval_f(model_args):
     
-    # print(f"jnp.shape(noisy_data): {jnp.shape(noisy_data)}")
-    # print(f"jnp.shape(noiseless_data): {jnp.shape(noiseless_data)}")
-    
-    def eval_model(vae):
-        difference_prediction = vae(noisy_data, deterministic=True)
-        # recon_x = data_processing.add_difference(noisy_data, recon_x)
+    @jax.jit
+    def eval_f(params, batch):
+        noisy_approx, clean_signal = batch
         
-        # Why is this in the eval_model function?
-        comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
-        
-        metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
-        return metrics, comparison
+        def eval_model(vae):
+            difference_prediction = vae(noisy_approx, deterministic=True)
+            
+            # Why is this in the eval_model function?
+            # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
+            
+            # metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
+            metrics = new_metrics(difference_prediction, noisy_approx, clean_signal, params)
+            return metrics#, comparison
 
-    return nn.apply(eval_model, models.model(**model_args))({'params': params})
+        return nn.apply(eval_model, models.model(
+            hidden=model_args["hidden"],
+            latents=model_args["latents"],
+            dropout_rate=model_args["dropout_rate"],
+            io_dim=model_args["io_dim"],
+        ))({'params': params})
+    return eval_f
 
 
 def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
@@ -154,7 +92,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         },
         "t_max": 100, 
         "t_len": 1000, 
-        "SNR": 100, 
+        "SNR": 100,
         "wavelet": "coif6", 
         "dtype": npfloat64,
     }
@@ -182,8 +120,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     io_dim = len(data_point_example[0][0])
     print(f"data_point_example[0].shape: {io_dim}")
     
-    del io_rng, data_point_example
-    
     # # Calculate the batch size based on the available memory and the maximum epoch size
     # batches, config.epoch_size = utils.calculate_batch_size(
     #     io_dim, 
@@ -195,13 +131,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     
     print(f"~~batch_size: {config.batch_size}")
     print(f"~~config.epoch_size: {config.epoch_size}")
-    
-    model_args = {
-        "latents": config.latents,
-        "hidden": config.hidden,
-        "dropout_rate": config.dropout_rate, 
-        "io_dim": io_dim
-    }
     
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
@@ -216,6 +145,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             opt_state=opt_state,  # Set the optimizer state
         )
     else:
+        model_args = {
+            "latents": config.latents,
+            "hidden": config.hidden,
+            "dropout_rate": config.dropout_rate, 
+            "io_dim": io_dim
+        }
+        
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
         init_data = jnp.ones((config.batch_size, io_dim), data_args["dtype"])
@@ -227,8 +163,21 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             params=params,
             tx=optax.adam(config.learning_rate),
         )
+        
+    train_step = create_train_step(model_args)
+    eval_f = create_eval_f(model_args)
     
-    del init_rng
+    # loss_dict = {
+    #     'mse': True, 
+    #     'mae': False, 
+    #     'huber': False, 
+    #     'log_mse': False, 
+    #     'max': True, 
+    #     'custom': False, 
+    #     'l2': True, 
+    # }
+    
+    del init_rng, io_rng, data_point_example
 
     metric_list = []
     
@@ -236,7 +185,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     del time_keeping
     
     # Train the model
+    # SNR_shift = 10.0
     for epoch in range(config.num_epochs):
+        # SNR_shift *= 1.1
+        # if SNR_shift > 100:
+        #     SNR_shift = 100
+        # data_args["SNR"] = SNR_shift
+        
+        # data_generator = input_pipeline.create_data_generator(data_args)
         
         start_time = time()
         
@@ -257,20 +213,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # print(f"time taken to generate data: {time()-start_time:.3f}s")
         # time_keeping = time()
         
-        # print(f"test_batch.shape: {len(test_batch)}")
-        # print(f"test_batch[0].shape: {test_batch[0].shape}")
-        # print(f"test_batch[1].shape: {test_batch[1].shape}")
-        
         # Train the model for one epoch
         for batch in train_ds:
             rng, dropout_rng = random.split(rng)
-            state = train_step(state, batch, model_args, dropout_rng)
+            state = train_step(state, batch, dropout_rng)
         
         # print(f"time taken to train: {time()-time_keeping:.3f}s")
         # time_keeping = time()
 
         # Evaluate the model
-        metrics, comparison = eval_f(state.params, test_batch, model_args)
+        metrics = eval_f(state.params, test_batch)
+        # metrics, comparison = eval_f(state.params, test_batch, model_args)
         
         # print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
         
@@ -288,13 +241,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             f"max: {metrics['max']:.5f}, "
             # f"huber: {metrics['huber']:.8f}, "
             # f"log_mse: {metrics['log_mse']:.8f}, "
-            f"l2: {metrics['l2']:.8f}"
+            # f"l2: {metrics['l2']:.8f}"
         )
         
         # Save the model
         if (epoch + 1) % 20 == 0:
             utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
-            utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
+            # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             
     # Save the results
     utils.plot_inverse_loss(metric_list, working_dir + "dae/loss.png")
