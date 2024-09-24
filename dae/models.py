@@ -24,7 +24,7 @@ class Encoder(nn.Module):
     # x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     
     # Latent layer  (hidden -> latent)
-    x = nn.Dense(self.latents, name='fc2_mean')(x)
+    x = nn.Dense(self.latents, name='fc3')(x)
     return x
 
 
@@ -49,7 +49,7 @@ class Decoder(nn.Module):
         # z = nn.Dropout(self.dropout_rate, deterministic=deterministic)(z)
 
         # Output layer  (hidden -> io_dim)
-        z = nn.Dense(self.io_dim, name='fc2')(z)
+        z = nn.Dense(self.io_dim, name='fc3')(z)
         return z
 
 
