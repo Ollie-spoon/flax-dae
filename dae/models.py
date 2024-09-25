@@ -1,6 +1,7 @@
 """DAE model definitions."""
 
 from flax import linen as nn
+from jax import jit, random, numpy as jnp
 
 
 class Encoder(nn.Module):
@@ -82,9 +83,8 @@ class DAE(nn.Module):
         return recon_x, mean, logvar
 
 # Currently does nothing but can be used to reparameterize the latents
-@jax.jit
-def reparameterize(x):
-    def reparameterize(rng, mean, logvar):
+@jit
+def reparameterize(rng, mean, logvar):
     std = jnp.exp(0.5 * logvar)
     eps = random.normal(rng, logvar.shape)
     return mean + eps * std

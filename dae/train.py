@@ -22,7 +22,7 @@ from loss import compute_metrics, new_metrics
 def create_train_step(model_args):
 
     @jax.jit
-    def train_step(state, batch, dropout_rng):
+    def train_step(state, batch, z_rng, dropout_rng):
         noisy_approx, clean_signal = batch
         
         def loss_fn(params):
@@ -34,6 +34,7 @@ def create_train_step(model_args):
             ).apply(
                 {'params': params},
                 x=noisy_approx,
+                z_rng=z_rng,
                 deterministic=False,
                 rngs={'dropout': dropout_rng},
             )
@@ -51,11 +52,12 @@ def create_train_step(model_args):
 def create_eval_f(model_args):
     
     @jax.jit
-    def eval_f(params, batch):
+    def eval_f(params, batch, z_rng):
         noisy_approx, clean_signal = batch
         
         def eval_model(vae):
-            prediction, mean, logvar = vae(noisy_approx, deterministic=True)
+            z_rng, 
+            prediction, mean, logvar = vae(noisy_approx, z_rng, deterministic=True)
             
             # Why is this in the eval_model function?
             # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
@@ -79,7 +81,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
     rng = random.key(0)
-    rng, init_rng, io_rng = random.split(rng, 3)
+    rng, init_rng, z_rng, io_rng = random.split(rng, 4)
     
     # Define the test data parameters
     data_args = {
@@ -93,7 +95,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         },
         "t_max": 100, 
         "t_len": 1000, 
-        "SNR": 10,
+        "SNR": 100,
         "wavelet": "coif6", 
         "dtype": npfloat64,
     }
@@ -156,7 +158,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
         init_data = jnp.ones((config.batch_size, io_dim), data_args["dtype"])
-        params = models.model(**model_args).init(init_rng, init_data)['params']
+        params = models.model(**model_args).init(init_rng, init_data, z_rng)['params']
 
         # Initialize the training state including the optimizer
         state = train_state.TrainState.create(
@@ -216,20 +218,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         # Train the model for one epoch
         for batch in train_ds:
-            rng, dropout_rng = random.split(rng)
-            state = train_step(state, batch, dropout_rng)
+            rng, z_rng, dropout_rng = random.split(rng, 3)
+            state = train_step(state, batch, z_rng, dropout_rng)
         
         # print(f"time taken to train: {time()-time_keeping:.3f}s")
         # time_keeping = time()
 
         # Evaluate the model
-        metrics = eval_f(state.params, test_batch)
+        rng, z_rng = random.split(rng)
+        metrics = eval_f(state.params, test_batch, z_rng)
         # metrics, comparison = eval_f(state.params, test_batch, model_args)
         
         # print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
         
-        # print(f"metrics: {metrics}")
-        # print(f"comparison: {comparison}")
         metric_list.append(metrics)
 
         # Print the evaluation metrics
@@ -237,8 +238,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             print(
                 f"eval epoch: {epoch + 1}, "
                 f"time {time()-start_time:.2f}s, "
-                f"loss: {metrics['loss']:.7f}, "
-                f"mse: {metrics['mse']:.10f}, "
+                f"loss: {metrics['loss']:.4f}, "
+                f"mse: {metrics['mse']:.4f}, "
+                f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
                 # f"max: {metrics['max']:.5f}, "
                 # f"huber: {metrics['huber']:.8f}, "

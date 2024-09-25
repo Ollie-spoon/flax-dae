@@ -97,13 +97,13 @@ def noise_injection(recon_diff, clean_signal):
 def new_metrics(recon_x, mean, logvar, clean_signal, model_params):
     
     # Noise injection/preprocessing
-    injected_denoised = noise_injection(recon_diff, clean_signal)
+    injected_denoised = noise_injection(recon_x, clean_signal)
     
     # calculating losses    
     metrics = {}
     
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
-    metrics["kl"] = get_kl_divergence(mean, logvar)
+    metrics["kl"] = get_kl_divergence(mean, logvar).mean()
     # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
     # metrics["l2"] = get_l2_loss(model_params)
