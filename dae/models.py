@@ -80,7 +80,7 @@ class DAE(nn.Module):
 
     def __call__(self, x, z_rng, deterministic: bool = True):
         mean, logvar = self.encoder(x, deterministic)
-        z = reparameterize(z_rng, mean, logvar) # used to be random for vae: reparameterize(x, z_rng)
+        # z = reparameterize_lognorm(z_rng, mean, logvar) # used to be random for vae: reparameterize(x, z_rng)
         z = reparameterize_truncated_normal(z_rng, mean, logvar, self.a, self.b)
         recon_x = self.decoder(z, deterministic)
         return recon_x, mean, logvar

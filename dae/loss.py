@@ -57,8 +57,16 @@ def get_custom_loss(recon_diff, original_diff, alpha=0.002):
 
 @vmap
 @jit
-def get_kl_divergence(mean, logvar):
+def get_kl_divergence_lognorm(mean, logvar):
   return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
+
+
+@vmap
+@jit
+def get_kl_divergence_truncated_normal(mean, logvar):
+    # a and b are the lower and upper bounds of the truncated normal distribution
+    return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar)) + \
+           jnp.log(jnp.erfc(-mean/jnp.sqrt(jnp.exp(logvar))))
 
 
 # Combine the loss functions into a single value
@@ -103,7 +111,9 @@ def new_metrics(recon_x, mean, logvar, clean_signal, model_params):
     metrics = {}
     
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
-    # metrics["kl"] = get_kl_divergence(mean, logvar).mean()
+    # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
+    metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
+    
     # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
     # metrics["l2"] = get_l2_loss(model_params)
