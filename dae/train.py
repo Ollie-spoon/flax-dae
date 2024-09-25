@@ -132,9 +132,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # del data_point_example
     # batch_size = config.epoch_size // batches
     
-    logging.info(f"batch_size: {config.batch_size}")
-    logging.info(f"config.epoch_size: {config.epoch_size}")
-    
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
         params, opt_state, model_args = utils.load_model(working_dir + config.checkpoint_restore_path)
@@ -186,6 +183,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     
     logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
     del time_keeping
+    
+    logging.info(
+        f"This training instance has the following details:\n"
+        f"configs: {config}\n"
+        f"data_args: {data_args}\n"
+    )
     
     # Train the model
     # SNR_shift = 10.0
@@ -242,10 +245,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 f"mse: {metrics['mse']:.4f}, "
                 # f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
-                f"max: {metrics['max']:.5f}, "
+                # f"max: {metrics['max']:.5f}, "
                 # f"huber: {metrics['huber']:.8f}, "
                 # f"log_mse: {metrics['log_mse']:.8f}, "
-                f"l2: {metrics['l2']:.8f}"
+                # f"l2: {metrics['l2']:.8f}"
             )
         
         # Save the model
