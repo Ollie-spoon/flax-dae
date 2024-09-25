@@ -121,7 +121,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Generate an example test data point to extract the input/output dimensions from
     data_point_example = next(data_generator(key=io_rng, n=1))
     io_dim = len(data_point_example[0][0])
-    print(f"data_point_example[0].shape: {io_dim}")
+    logging.info(f"data_point_example[0].shape: {io_dim}")
     
     # # Calculate the batch size based on the available memory and the maximum epoch size
     # batches, config.epoch_size = utils.calculate_batch_size(
@@ -132,8 +132,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # del data_point_example
     # batch_size = config.epoch_size // batches
     
-    print(f"~~batch_size: {config.batch_size}")
-    print(f"~~config.epoch_size: {config.epoch_size}")
+    logging.info(f"batch_size: {config.batch_size}")
+    logging.info(f"config.epoch_size: {config.epoch_size}")
     
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
@@ -184,7 +184,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
     metric_list = []
     
-    print(f"time taken to initialize: {time()-time_keeping:.3f}s")
+    logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
     del time_keeping
     
     # Train the model

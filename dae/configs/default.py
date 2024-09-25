@@ -8,13 +8,13 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     config.learning_rate = 0.0001
-    config.latents = 20
+    config.latents = 40
     config.hidden = 95
     config.dropout_rate = 0.2
     config.io_dim = 95
     config.batch_size = 1000
     config.epoch_size = 20000
-    config.num_epochs = 5000
+    config.num_epochs = 2000
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
     return config
