@@ -1,5 +1,6 @@
 from jax import jit, vmap, tree_util
 import jax.numpy as jnp
+from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
 
 @vmap
@@ -66,7 +67,7 @@ def get_kl_divergence_lognorm(mean, logvar):
 def get_kl_divergence_truncated_normal(mean, logvar):
     # a and b are the lower and upper bounds of the truncated normal distribution
     return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar)) + \
-           jnp.log(jnp.erfc(-mean/jnp.sqrt(jnp.exp(logvar))))
+           jnp.log(erfc(-mean/jnp.sqrt(jnp.exp(logvar))))
 
 
 # Combine the loss functions into a single value
