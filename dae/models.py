@@ -63,8 +63,6 @@ class DAE(nn.Module):
     hidden: int
     dropout_rate: float
     io_dim: int
-    a: float=0
-    b: float=jnp.inf
 
     def setup(self):
         self.encoder = Encoder(
@@ -81,7 +79,7 @@ class DAE(nn.Module):
     def __call__(self, x, z_rng, deterministic: bool = True):
         mean, logvar = self.encoder(x, deterministic)
         # z = reparameterize_lognorm(z_rng, mean, logvar) # used to be random for vae: reparameterize(x, z_rng)
-        z = reparameterize_truncated_normal(z_rng, mean, logvar, self.a, self.b)
+        z = reparameterize_truncated_normal(z_rng, mean, logvar)
         recon_x = self.decoder(z, deterministic)
         return recon_x, mean, logvar
 
@@ -93,10 +91,10 @@ def reparameterize_lognorm(rng, mean, logvar):
     return mean + eps * std
 
 @jit
-def reparameterize_truncated_normal(rng, mean, logvar, a, b):
+def reparameterize_truncated_normal(rng, mean, logvar):
     # a and b are the lower and upper bounds of the truncated normal distribution
     std = jnp.exp(0.5 * logvar)
-    eps = random.truncated_normal(rng, mean.shape, a, b)
+    eps = random.truncated_normal(key=rng, lower=0, upper=jnp.inf, shape=logvar.shape)
     return mean + eps * std
 
 
