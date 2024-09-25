@@ -24,8 +24,10 @@ class Encoder(nn.Module):
     # x = nn.Dropout(self.dropout_rate, deterministic=deterministic)(x)
     
     # Latent layer  (hidden -> latent)
-    x = nn.Dense(self.latents, name='fc3')(x)
-    return x
+    mean_x = nn.Dense(self.latents, name='fc3_mean')(x)
+    logvar_x = nn.Dense(self.latents, name='fc3_logvar')(x)
+    # x = nn.Dense(self.latents, name='fc3')(x)
+    return mean_x, logvar_x
 
 
 class Decoder(nn.Module):
@@ -73,15 +75,19 @@ class DAE(nn.Module):
             self.io_dim,
         )
 
-    def __call__(self, x, deterministic: bool = True):
-        x = self.encoder(x, deterministic)
-        z = reparameterize(x) # used to be random for vae: reparameterize(x, z_rng)
+    def __call__(self, x, z_rng, deterministic: bool = True):
+        mean, logvar = self.encoder(x, deterministic)
+        z = reparameterize(z_rng, mean, logvar) # used to be random for vae: reparameterize(x, z_rng)
         recon_x = self.decoder(z, deterministic)
-        return recon_x
+        return recon_x, mean, logvar
 
 # Currently does nothing but can be used to reparameterize the latents
+@jax.jit
 def reparameterize(x):
-    return x
+    def reparameterize(rng, mean, logvar):
+    std = jnp.exp(0.5 * logvar)
+    eps = random.normal(rng, logvar.shape)
+    return mean + eps * std
 
 
 def model(latents, hidden, dropout_rate, io_dim):

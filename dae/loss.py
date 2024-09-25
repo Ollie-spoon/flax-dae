@@ -55,6 +55,12 @@ def get_l2_loss(params, alpha=0.00000001):
 def get_custom_loss(recon_diff, original_diff, alpha=0.002):
     return alpha * jnp.max([0, 1 - recon_diff/original_diff]).mean()
 
+@vmap
+@jit
+def get_kl_divergence(mean, logvar):
+  return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
+
+
 # Combine the loss functions into a single value
 def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
         
@@ -88,7 +94,7 @@ def noise_injection(recon_diff, clean_signal):
 
 # Combine the loss functions into a single value
 @jit
-def new_metrics(recon_diff, clean_signal, model_params):
+def new_metrics(recon_x, mean, logvar, clean_signal, model_params):
     
     # Noise injection/preprocessing
     injected_denoised = noise_injection(recon_diff, clean_signal)
@@ -97,7 +103,8 @@ def new_metrics(recon_diff, clean_signal, model_params):
     metrics = {}
     
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
-    metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
+    metrics["kl"] = get_kl_divergence(mean, logvar)
+    # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
     # metrics["l2"] = get_l2_loss(model_params)
     

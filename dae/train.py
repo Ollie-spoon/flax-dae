@@ -26,7 +26,7 @@ def create_train_step(model_args):
         noisy_approx, clean_signal = batch
         
         def loss_fn(params):
-            prediction = models.model(
+            prediction, mean, logvar = models.model(
                 hidden=model_args["hidden"],
                 latents=model_args["latents"],
                 dropout_rate=model_args["dropout_rate"],
@@ -39,7 +39,7 @@ def create_train_step(model_args):
             )
 
             # loss = compute_metrics(difference_prediction, noiseless_data, noisy_approx, state.params)['loss']
-            loss = new_metrics(prediction, clean_signal, params)["loss"]
+            loss = new_metrics(prediction, mean, logvar, clean_signal, params)["loss"]
             return loss
 
         grads = jax.grad(loss_fn)(state.params)
@@ -55,13 +55,13 @@ def create_eval_f(model_args):
         noisy_approx, clean_signal = batch
         
         def eval_model(vae):
-            prediction = vae(noisy_approx, deterministic=True)
+            prediction, mean, logvar = vae(noisy_approx, deterministic=True)
             
             # Why is this in the eval_model function?
             # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
             
             # metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
-            metrics = new_metrics(prediction, clean_signal, params)
+            metrics = new_metrics(prediction, mean, logvar, clean_signal, params)
             return metrics#, comparison
 
         return nn.apply(eval_model, models.model(
@@ -93,7 +93,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         },
         "t_max": 100, 
         "t_len": 1000, 
-        "SNR": 100,
+        "SNR": 10,
         "wavelet": "coif6", 
         "dtype": npfloat64,
     }
@@ -240,7 +240,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 f"loss: {metrics['loss']:.7f}, "
                 f"mse: {metrics['mse']:.10f}, "
                 # f"mae: {metrics['mae']:.8f}, "
-                f"max: {metrics['max']:.5f}, "
+                # f"max: {metrics['max']:.5f}, "
                 # f"huber: {metrics['huber']:.8f}, "
                 # f"log_mse: {metrics['log_mse']:.8f}, "
                 # f"l2: {metrics['l2']:.8f}"
