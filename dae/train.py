@@ -234,22 +234,22 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         metric_list.append(metrics)
 
         # Print the evaluation metrics
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 10 == 0:
             print(
                 f"eval epoch: {epoch + 1}, "
                 f"time {time()-start_time:.2f}s, "
                 f"loss: {metrics['loss']:.4f}, "
                 f"mse: {metrics['mse']:.4f}, "
-                f"kl: {metrics['kl']:.8f}, "
+                # f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
-                # f"max: {metrics['max']:.5f}, "
+                f"max: {metrics['max']:.5f}, "
                 # f"huber: {metrics['huber']:.8f}, "
                 # f"log_mse: {metrics['log_mse']:.8f}, "
-                # f"l2: {metrics['l2']:.8f}"
+                f"l2: {metrics['l2']:.8f}"
             )
         
         # Save the model
-        if (epoch + 1) % 60 == 0:
+        if (epoch + 1) % 100 == 0:
             utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
             # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             

@@ -103,10 +103,10 @@ def new_metrics(recon_x, mean, logvar, clean_signal, model_params):
     metrics = {}
     
     metrics["mse"] = get_mse_loss(injected_denoised, clean_signal).mean()
-    metrics["kl"] = get_kl_divergence(mean, logvar).mean()
-    # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
+    # metrics["kl"] = get_kl_divergence(mean, logvar).mean()
+    metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
     
-    # metrics["l2"] = get_l2_loss(model_params)
+    metrics["l2"] = get_l2_loss(model_params)
     
     # for key, value in metrics.items():
     #     # print(f"{key}: {value}")
