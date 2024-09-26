@@ -56,7 +56,7 @@ def get_max_loss(recon_x, noiseless_x, scale=72.51828996):
 
 # L2 Regularization Loss
 @jit
-def get_l2_loss(params, alpha=0.0000001):
+def get_l2_loss(params, alpha=0.000001):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
     return alpha * sum(tree_util.tree_leaves(l2_loss))
 
