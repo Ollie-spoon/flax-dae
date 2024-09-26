@@ -1,5 +1,5 @@
 from jax import jit, vmap, tree_util
-from jax.debug import print
+from jax.debug import jprint
 import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
@@ -127,13 +127,13 @@ def create_compute_metrics(wavelet, mode):
         # Noise injection/preprocessing
         injected_denoised = noise_injection(recon_approx, clean_signal)
         
-        # print(f"recon_approx: {recon_approx.shape}")
-        # print(f"noisy_approx: {noisy_approx.shape}")
-        # print(f"mean: {mean.shape}")
-        # print(f"logvar: {logvar.shape}")
-        # print(f"clean_signal: {clean_signal.shape}")
-        # print(f"model_params: {model_params}")
-        # print(f"injected_denoised: {injected_denoised.shape}")
+        # jprint(f"recon_approx: {recon_approx.shape}")
+        # jprint(f"noisy_approx: {noisy_approx.shape}")
+        # jprint(f"mean: {mean.shape}")
+        # jprint(f"logvar: {logvar.shape}")
+        # jprint(f"clean_signal: {clean_signal.shape}")
+        # jprint(f"model_params: {model_params}")
+        # jprint(f"injected_denoised: {injected_denoised.shape}")
         
         # calculating losses    
         metrics = {}
@@ -153,8 +153,8 @@ def create_compute_metrics(wavelet, mode):
         metrics["l2"] = get_l2_loss(model_params)
         
         # for key, value in metrics.items():
-        #     print(f"key: {key}")
-        #     print("value: {}", value)
+        #     jprint(f"key: {key}")
+        #     jprint("value: {}", value)
         
         metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
         

@@ -20,6 +20,8 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
+    rng = 2024*int(time())
+    print(f"rng: {rng}")
     rng = key(2024*int(time()))
     rng, key1, key2, key3, key4 = split(rng, 5)
     
