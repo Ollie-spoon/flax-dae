@@ -56,7 +56,7 @@ def get_max_loss(recon_x, noiseless_x, scale=72.51828996):
 
 # L2 Regularization Loss
 @jit
-def get_l2_loss(params, alpha=0.000001):
+def get_l2_loss(params, alpha=0.00001):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
     return alpha * sum(tree_util.tree_leaves(l2_loss))
 
@@ -102,11 +102,11 @@ def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_sca
     clean_fft = jnp.fft.fft(clean_signal)
     noisy_fft = jnp.fft.fft(noisy_signal)
     
-    clean_mag = jnp.abs(clean_fft)
-    clean_phase = jnp.angle(clean_fft)
+    clean_mag = jnp.abs(clean_fft)[0:34]
+    clean_phase = jnp.angle(clean_fft)[0:34]
     
-    noisy_mag = jnp.abs(noisy_fft)
-    noisy_phase = jnp.angle(noisy_fft)
+    noisy_mag = jnp.abs(noisy_fft)[0:34]
+    noisy_phase = jnp.angle(noisy_fft)[0:34]
     
     mag_mean = jnp.sqrt(
         jnp.mean(jnp.square(clean_mag - noisy_mag)) +
@@ -146,8 +146,8 @@ def create_compute_metrics(wavelet, mode):
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
-            mag_scale=6,
-            phase_scale=1000000,
+            mag_scale=60,
+            phase_scale=10000,
             mag_max_scale=0.05,
             phase_max_scale=1,
         )

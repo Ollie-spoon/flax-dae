@@ -46,16 +46,19 @@ def denoise_bi_exponential():
     
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
     a1, a2 = 0.6, 0.4
-    tau1 = random.uniform(key1, 
-                   minval=data_args["params"]["tau1_min"], 
-                   maxval=data_args["params"]["tau1_max"], 
-                   shape=())
-    tau2 = random.uniform(key2, 
-                   minval=data_args["params"]["tau2_min"], 
-                   maxval=data_args["params"]["tau2_max"], 
-                   shape=())
-    # tau1, tau2 = 40, 120
+    # tau1 = random.uniform(key1, 
+    #                minval=data_args["params"]["tau1_min"], 
+    #                maxval=data_args["params"]["tau1_max"], 
+    #                shape=())
+    # tau2 = random.uniform(key2, 
+    #                minval=data_args["params"]["tau2_min"], 
+    #                maxval=data_args["params"]["tau2_max"], 
+    #                shape=())
+    tau1, tau2 = 40, 120
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
+    
+    print(f"Amplitudes: {a1}, {a2}")
+    print(f"Decay constants: {tau1}, {tau2}")
 
     # Add Gaussian noise
     SNR = 100
@@ -71,7 +74,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\thurs_17_latent_30.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\wt_loss_only_669520_var.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:
