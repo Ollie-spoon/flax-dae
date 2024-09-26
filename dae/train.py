@@ -84,7 +84,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
-    rng = random.key(0)
+    rng = random.key(2024)
     rng, init_rng, z_rng, io_rng = random.split(rng, 4)
     
     # Define the test data parameters
