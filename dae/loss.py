@@ -145,8 +145,8 @@ def create_compute_metrics(wavelet, mode):
             injected_denoised, 
             mag_scale=160, 
             phase_scale=5000000,
-            mag_max_scale=2,
-            phase_max_scale=20,
+            mag_max_scale=0.1,
+            phase_max_scale=10,
         )
         metrics["mse_fft_m"] = mag.mean()
         metrics["mse_fft_p"] = phase.mean()
