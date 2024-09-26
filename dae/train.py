@@ -166,7 +166,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
     metric_list = []
     best_loss = jnp.inf
-    best_state = None
     
     logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
     del time_keeping
@@ -230,21 +229,20 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # Save the best model, assuming that it performs equally well on the validation set
         if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
             current_loss = metrics['loss']
-            if best_state is not None:
-                # Create a validation data set 
-                rng, test_rng, z_rng = random.split(rng, 3)
-                test_batch = next(data_generator(
-                    key=test_rng, 
-                    n=config.batch_size
-                ))
-                metrics = eval_f(state.params, test_batch, z_rng)
-                
-                current_loss = jnp.maximum(metrics['loss'], current_loss)
-                
-                if current_loss < best_loss:
-                    best_state = state
-                    best_loss = current_loss
-                    utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
+            
+            # Create a validation data set 
+            rng, test_rng, z_rng = random.split(rng, 3)
+            test_batch = next(data_generator(
+                key=test_rng, 
+                n=config.batch_size
+            ))
+            metrics = eval_f(state.params, test_batch, z_rng)
+            
+            current_loss = jnp.maximum(metrics['loss'], current_loss)
+            
+            if current_loss < best_loss:
+                best_loss = current_loss
+                utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
         # Save the model
         if (epoch + 1) % 100 == 0:
