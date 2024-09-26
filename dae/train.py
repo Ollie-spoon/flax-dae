@@ -227,7 +227,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
+        # if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
+        if metrics['loss'] < best_loss:
             current_loss = metrics['loss']
             
             # Create a validation data set 
