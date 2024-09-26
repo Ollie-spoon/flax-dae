@@ -228,18 +228,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 f"eval epoch: {epoch + 1}, "
                 f"time {time()-start_time:.2f}s, "
                 f"loss: {metrics['loss']:.4f}, "
-                # f"mse_t: {metrics['mse_t']:.4f}, "
                 f"mse_wt: {metrics['mse_wt']:.4f}, "
-                # f"kl: {metrics['kl']:.8f}, "
+                f"mse_t: {metrics['mse_t']:.4f}, "
+                f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
                 # f"max: {metrics['max']:.5f}, "
                 # f"huber: {metrics['huber']:.8f}, "
                 # f"log_mse: {metrics['log_mse']:.8f}, "
-                # f"l2: {metrics['l2']:.8f}"
+                f"l2: {metrics['l2']:.8f}"
             )
             
         if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
             best_loss = metrics['loss']
+            print(f"New best loss at epoch {epoch + 1}: {best_loss:.4f}")
             state = utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args)
         
         # Save the model
