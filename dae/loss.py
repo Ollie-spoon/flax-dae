@@ -122,7 +122,7 @@ def create_compute_metrics(wavelet, mode):
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
         
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
-        metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
+        # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
         # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
         

@@ -99,7 +99,7 @@ def plot_inverse_loss(metric_list, save_path):
     
 
 
-def save_model(state, step: int, ckpt_dir: str, model_args: dict):
+def save_model(state, step: int, ckpt_dir: str, model_args: dict, logging=True):
     """Save model parameters, optimizer state, and model arguments using pickle."""
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
@@ -120,7 +120,8 @@ def save_model(state, step: int, ckpt_dir: str, model_args: dict):
     with open(save_path, 'wb') as f:
         pickle.dump(checkpoint, f)
     
-    print(f"Checkpoint saved at step {step} in {save_path}")
+    if logging:
+        print(f"Checkpoint saved at step {step} in {save_path}")
     
 def load_model(ckpt_path: str):
     """Load model parameters, optimizer state, and model arguments from a pickle checkpoint."""
