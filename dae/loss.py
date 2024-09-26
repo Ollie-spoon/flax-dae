@@ -108,7 +108,10 @@ def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_sca
     noisy_mag = jnp.abs(noisy_fft)
     noisy_phase = jnp.angle(noisy_fft)
     
-    mag_mean = jnp.mean(jnp.square(clean_mag - noisy_mag))*mag_scale
+    mag_mean = jnp.sqrt(
+        jnp.mean(jnp.square(clean_mag - noisy_mag)) +
+        jnp.mean(jnp.abs(clean_mag - noisy_mag))
+        )*mag_scale
     phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
     
     mag_max = jnp.max(jnp.abs(clean_mag - noisy_mag))*mag_max_scale
@@ -143,7 +146,7 @@ def create_compute_metrics(wavelet, mode):
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
-            mag_scale=200,
+            mag_scale=60,
             phase_scale=1000000,
             mag_max_scale=0.05,
             phase_max_scale=1,
