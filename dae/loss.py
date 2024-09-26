@@ -112,7 +112,7 @@ def create_compute_metrics(wavelet, mode):
     def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
 
         # Noise injection/preprocessing
-        injected_denoised = noise_injection(recon_approx, clean_signal)
+        # injected_denoised = noise_injection(recon_approx, clean_signal)
         
 
         # print(f"recon_approx: {recon_approx.shape}")
@@ -126,7 +126,7 @@ def create_compute_metrics(wavelet, mode):
         # calculating losses    
         metrics = {}
         
-        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
+        # metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=8919).mean()
         
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
