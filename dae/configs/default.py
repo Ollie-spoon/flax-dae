@@ -8,7 +8,7 @@ def get_config():
     config = ml_collections.ConfigDict()
 
     config.learning_rate = 0.0005
-    config.latents = 20
+    config.latents = 30
     config.hidden = 95
     config.dropout_rate = 0.2
     config.io_dim = 68
