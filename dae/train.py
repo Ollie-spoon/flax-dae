@@ -238,7 +238,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             ))
             metrics = eval_f(state.params, test_batch, z_rng)
             
-            current_loss = jnp.maximum(jnp.array([metrics['loss'], current_loss]))
+            current_loss = jnp.maximum(metrics['loss'], current_loss)
             
             if current_loss < best_loss:
                 best_loss = current_loss
