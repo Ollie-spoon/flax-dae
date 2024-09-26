@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax
-from cr.wavelets import wavedec
+from cr.wavelets import wavedec, downcoef
 from typing import Union
 
 def create_multi_exponential_decay(t):
@@ -9,30 +9,37 @@ def create_multi_exponential_decay(t):
         return decay
     return jax.jit(multi_exponential_decay)
 
-def create_wavelet_decomposition(wavelet, mode='symmetric'):
+def create_wavelet_decomposition(wavelet, mode):
     def wavelet_decomposition(data):
         coeffs = wavedec(data=data, wavelet=wavelet, mode=mode)
         return coeffs
     return jax.jit(wavelet_decomposition)
 
+def create_wavelet_approx(wavelet, mode, max_dwt_level):
+    def wavelet_approx(data):
+        coeffs = downcoef(part='a', data=data, wavelet=wavelet, mode=mode, level=max_dwt_level)
+        return coeffs
+    return jax.jit(wavelet_approx)
+
 # JIT compile and parallelize single data generation
-def create_generate_single_data(t, noise_power, wavelet):
+def create_generate_single_data(t, noise_power, wavelet, mode, max_dwt_level):
     
     multi_exponential_decay = create_multi_exponential_decay(t)
-    wavelet_decomposition = create_wavelet_decomposition(wavelet)
+    wavelet_decomposition = create_wavelet_decomposition(wavelet, mode)
+    wavelet_approx = create_wavelet_approx(wavelet, mode, max_dwt_level)
     
     # Efficient noise generation inside the JIT function
     @jax.jit
     def generate_single_data(key, params):
-        decay_truth = multi_exponential_decay(params)
-        noisy_signal = decay_truth + noise_power * jax.random.normal(key, shape=t.shape)
-        # noisy_signal = decay_truth + noise_power * jax.random.laplace(key, shape=t.shape)
-        # noisy_signal = decay_truth + noise_power * jax.random.cauchy(key, shape=t.shape)
+        clean_signal = multi_exponential_decay(params)
+        noisy_signal = clean_signal + noise_power * jax.random.normal(key, shape=t.shape)
+        # noisy_signal = clean_signal + noise_power * jax.random.laplace(key, shape=t.shape)
+        # noisy_signal = clean_signal + noise_power * jax.random.cauchy(key, shape=t.shape)
 
         # Perform wavelet decomposition
-        noisy_coeffs = wavelet_decomposition(noisy_signal)[0]
+        noisy_coeffs = wavelet_approx(noisy_signal)
 
-        return noisy_coeffs, decay_truth
+        return noisy_coeffs, clean_signal
     
     return generate_single_data
 
@@ -53,13 +60,15 @@ def create_generate_basic_data(
         t_len: int, 
         SNR: Union[int, float], 
         wavelet: str, 
-        dtype: type = jnp.float64
+        mode: str,
+        max_dwt_level: int,
+        dtype: type,
     ):
     
     # Use linspace directly in JAX with dtype
     t = jnp.linspace(0, t_max, t_len, dtype=dtype)
     noise_power = (params["a1"] + params["a2"]) / SNR
-    generate_single_data = create_generate_single_data(t, noise_power, wavelet)
+    generate_single_data = create_generate_single_data(t, noise_power, wavelet, mode, max_dwt_level)
     batched_generate = jax.vmap(generate_single_data, in_axes=(0, 1))
     
     def generate_basic_data(key, iterations):

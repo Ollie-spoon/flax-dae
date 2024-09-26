@@ -12,14 +12,16 @@ from time import time
 from numpy import float64 as npfloat64
 
 import optax
-import input_pipeline
 import models
 import utils
 import data_processing
-from loss import compute_metrics, new_metrics
+from input_pipeline import create_data_generator
+from loss import create_compute_metrics
 
 # Define the training step
-def create_train_step(model_args):
+def create_train_step(model_args, data_args):
+    
+    get_metrics = create_compute_metrics(data_args["wavelet"], data_args["mode"])
 
     @jax.jit
     def train_step(state, batch, z_rng, dropout_rng):
@@ -40,7 +42,7 @@ def create_train_step(model_args):
             )
 
             # loss = compute_metrics(difference_prediction, noiseless_data, noisy_approx, state.params)['loss']
-            loss = new_metrics(prediction, mean, logvar, clean_signal, params)["loss"]
+            loss = get_metrics(prediction, noisy_approx, mean, logvar, clean_signal, params)["loss"]
             return loss
 
         grads = jax.grad(loss_fn)(state.params)
@@ -49,7 +51,9 @@ def create_train_step(model_args):
 
 
 # Define the evaluation function
-def create_eval_f(model_args):
+def create_eval_f(model_args, data_args):
+    
+    get_metrics = create_compute_metrics(data_args["wavelet"], data_args["mode"])
     
     @jax.jit
     def eval_f(params, batch, z_rng):
@@ -59,11 +63,11 @@ def create_eval_f(model_args):
             z_rng, 
             prediction, mean, logvar = vae(noisy_approx, z_rng, deterministic=True)
             
-            # Why is this in the eval_model function?
+            # This could be reintroduced at some point
             # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
             
             # metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
-            metrics = new_metrics(prediction, mean, logvar, clean_signal, params)
+            metrics = get_metrics(prediction, noisy_approx, mean, logvar, clean_signal, params)
             return metrics#, comparison
 
         return nn.apply(eval_model, models.model(
@@ -88,52 +92,31 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "params": {
             "a1": 0.6, 
             "a2": 0.4, 
-            "tau1_min": 5, 
-            "tau1_max": 30, 
-            "tau2_min": 20, 
-            "tau2_max": 45,
+            "tau1_min": 20, 
+            "tau1_max": 120, 
+            "tau2_min": 80, 
+            "tau2_max": 180,
         },
-        "t_max": 100, 
-        "t_len": 1000, 
+        "t_max": 400, 
+        "t_len": 1120, 
         "SNR": 100,
         "wavelet": "coif6", 
-        "dtype": npfloat64,
+        "mode": "zero",
+        "dtype": jnp.float32,
     }
     
-    # data_args = {
-    #     "params": {
-    #         "a1": 0.6, 
-    #         "a2": 0.4, 
-    #         "tau1_min": 30, 
-    #         "tau1_max": 50, 
-    #         "tau2_min": 100, 
-    #         "tau2_max": 140,
-    #     },
-    #     "t_max": 480, 
-    #     "t_len": 1000, 
-    #     "SNR": 100,
-    #     "wavelet": "coif6", 
-    #     "dtype": npfloat64,
-    # }
+    # Generate extract the input/output dimensions and maximum number of 
+    # dwt transforms allowed from this length signal
+    io_dim, max_dwt_level = utils.get_approx_length(data_args["t_len"], data_args["wavelet"])
+    logging.info(f"io_dim: {io_dim}")
+    if io_dim != config.io_dim:
+        logging.info(f"Warning: io_dim ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
     
-    data_generator = input_pipeline.create_data_generator(data_args)
-    
-    # Generate an example test data point to extract the input/output dimensions from
-    data_point_example = next(data_generator(key=io_rng, n=1))
-    io_dim = len(data_point_example[0][0])
-    logging.info(f"data_point_example[0].shape: {io_dim}")
-    
-    # # Calculate the batch size based on the available memory and the maximum epoch size
-    # batches, config.epoch_size = utils.calculate_batch_size(
-    #     io_dim, 
-    #     type(data_point_example[0][0]), 
-    #     config.epoch_size,
-    # )
-    # del data_point_example
-    # batch_size = config.epoch_size // batches
+    data_args["max_dwt_level"] = max_dwt_level
     
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
+        # Restore the model and the optimizer state
         params, opt_state, model_args = utils.load_model(working_dir + config.checkpoint_restore_path)
 
         # Restore the train state
@@ -164,8 +147,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             tx=optax.adam(config.learning_rate),
         )
         
-    train_step = create_train_step(model_args)
-    eval_f = create_eval_f(model_args)
+    # Create the data generator
+    train_step = create_train_step(model_args, data_args)
+    eval_f = create_eval_f(model_args, data_args)
+    data_generator = create_data_generator(data_args)
     
     # loss_dict = {
     #     'mse': True, 
@@ -177,7 +162,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     #     'l2': True, 
     # }
     
-    del init_rng, io_rng, data_point_example
+    del init_rng, io_rng
 
     metric_list = []
     
@@ -242,7 +227,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 f"eval epoch: {epoch + 1}, "
                 f"time {time()-start_time:.2f}s, "
                 f"loss: {metrics['loss']:.4f}, "
-                f"mse: {metrics['mse']:.4f}, "
+                f"mse_t: {metrics['mse_t']:.4f}, "
+                f"mse_wt: {metrics['mse_wt']:.4f}, "
                 f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
                 # f"max: {metrics['max']:.5f}, "

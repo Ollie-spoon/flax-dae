@@ -3,7 +3,7 @@ from jax import jit, random
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
 from jax.random import uniform, normal, split, key
-from cr.wavelets import wavedec, waverec
+from cr.wavelets import wavedec, waverec, downcoef
 import pickle
 from flax import linen as nn
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2025)
+    rng = key(2027)
     rng, key1, key2, key3, key4 = split(rng, 5)
     
     t = jnp.linspace(0, 100, 1000)
@@ -29,7 +29,7 @@ def denoise_bi_exponential():
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
 
     # Add Gaussian noise
-    SNR = 200
+    SNR = 100
     noise_scale = 1/SNR
     noise = noise_scale * normal(key3, shape=t.shape)
     noisy_decay = decay + noise
@@ -46,26 +46,31 @@ def denoise_bi_exponential():
         checkpoint = pickle.load(f)
 
     # Pass approximation coefficients through neural network
-    approx_coeffs = coeffs[0]
-    denoised_approx_coeffs = eval_f(
+    noisy_approx = coeffs[0]
+    denoised_approx_coeffs, _, _ = eval_f(
         params=checkpoint['params'],
-        noisy_data=approx_coeffs,
+        noisy_data=noisy_approx,
         model_args=checkpoint['model_args'],
         z_rng=key4
     )
+    
+    print(f"model_args: {checkpoint['model_args']}")
+    
+    # print(f"type(denoised_approx_coeffs): {type(denoised_approx_coeffs)}")
+    # print(f"denoised_approx_coeffs: {denoised_approx_coeffs}")
+    
 
     # Inverse wavelet decomposition with denoised approximation coefficients
     plt.title("Comparison of noisy and denoised approximation coefficients.")
     # plt.plot(coeffs[0], label='Noisy')
-    noisy_approx = coeffs[0]
-    coeffs[0] += denoised_approx_coeffs
-    plt.plot(coeffs[0], label='Denoised')
-    plt.plot(jnp.log10(clean_approx), label='Clean')
+    plt.plot(denoised_approx_coeffs, label='Denoised')
+    plt.plot(clean_approx, label='Clean')
     plt.xlabel("index")
     plt.ylabel("coefficient amplitude")
     plt.legend()
     plt.show()
     
+    coeffs[0] = denoised_approx_coeffs
     denoised_decay = waverec(coeffs, wavelet, mode=mode)
     coeffs_clean[0] = noisy_approx
     injected_original = waverec(coeffs_clean, wavelet, mode=mode)
@@ -75,8 +80,11 @@ def denoise_bi_exponential():
     print(f"The original SNR of the signal was {1/jnp.std(noisy_decay-decay)}")
     print(f"The denoised signal SNR was {1/jnp.std(denoised_decay-decay)}")
     
-    print(f"The mse loss for the noisy signal was {get_mse_loss(noisy_approx, clean_approx)}")
-    print(f"The mse loss for the denoised signal was {get_mse_loss(coeffs[0], clean_approx)}")
+    print(f"mse of denoised approx coefficients: {get_mse_loss(denoised_approx_coeffs, clean_approx)}")
+    print(f"mse of noisy approx coefficients: {get_mse_loss(noisy_approx, clean_approx)}")
+    
+    print(f"The mse loss for the noisy signal was {get_mse_loss(injected_original, decay)}")
+    print(f"The mse loss for the denoised signal was {get_mse_loss(injected_denoised, decay)}")
 
     # Plot comparison
     plt.title("Comparison of noisy and denoised signals")
@@ -95,6 +103,13 @@ def denoise_bi_exponential():
     plt.ylabel("signal noise amplitude")
     plt.legend()
     plt.show()
+    
+    
+    
+    noisy_approx_ish = downcoef(part='a', data=noisy_decay, wavelet=wavelet, mode=mode, level=4)
+    
+    print(noisy_approx_ish.shape)
+    print(noisy_approx.shape)
     
     # For this section we are going to test out some interesting things
     

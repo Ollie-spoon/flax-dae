@@ -8,9 +8,23 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import os
 # from jax import devices
+from cr.wavelets import dwt_max_level
+from pywt import Wavelet
 import pickle
 # import GPUtil
 # import psutil
+
+def get_approx_length(signal_length, wavelet):
+    if type(wavelet) == str:
+        wavelet = Wavelet(wavelet)
+    max_level = dwt_max_level(signal_length, wavelet.dec_len)
+    return dwt_coeff_len(signal_length, wavelet, level=max_level), max_level
+
+def dwt_coeff_len(signal_length, wavelet, level=1):
+    if level == 0:
+        return int(signal_length)
+    signal_length = jnp.floor((signal_length + wavelet.dec_len - 1) / 2)
+    return dwt_coeff_len(signal_length, wavelet, level-1)
 
 def plot_comparison(comparison, epoch_number, save_location):
     fig, axes = plt.subplots(3, 2, figsize=(12, 18))
