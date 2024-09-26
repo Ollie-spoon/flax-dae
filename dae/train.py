@@ -230,6 +230,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 f"loss: {metrics['loss']:.4f}, "
                 f"mse_wt: {metrics['mse_wt']:.4f}, "
                 f"mse_t: {metrics['mse_t']:.4f}, "
+                f"mse_t: {metrics['mse_fft']:.4f}, "
                 # f"kl: {metrics['kl']:.8f}, "
                 # f"mae: {metrics['mae']:.8f}, "
                 # f"max: {metrics['max']:.5f}, "

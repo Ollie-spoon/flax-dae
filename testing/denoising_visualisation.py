@@ -19,7 +19,7 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2021)
+    rng = key(2024)
     rng, key1, key2, key3, key4 = split(rng, 5)
     
     # Define the test data parameters
@@ -50,7 +50,7 @@ def denoise_bi_exponential():
                    minval=data_args["params"]["tau2_min"], 
                    maxval=data_args["params"]["tau2_max"], 
                    shape=())
-    tau1, tau2 = 40, 120
+    # tau1, tau2 = 40, 120
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
 
     # Add Gaussian noise
@@ -67,7 +67,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_12_100snr_var.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_6365_100snr_var.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
 
     # Pass approximation coefficients through neural network
@@ -120,11 +120,11 @@ def denoise_bi_exponential():
     # plt.legend()
     # plt.show()
     
-    plt.title("Comparison of noisy and denoised approximation coefficient injections")
-    plt.plot(t, noisy_decay - decay, label='Noisy')
+    plt.title("Comparison of noise before and after denoising\nin the time domain")
+    plt.plot(t, noisy_decay - decay, label='Noise (all freq)')
     plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
-    plt.plot(t, injected_original - decay, label='Noisy Injected')
-    plt.plot(t, injected_denoised - decay, label='Denoised Injected')
+    plt.plot(t, injected_original - decay, label='Before denoising (low freq)')
+    plt.plot(t, injected_denoised - decay, label='After denoising (low freq)')
     plt.xlabel("time (ms)")
     plt.ylabel("signal noise amplitude")
     plt.legend()
@@ -142,8 +142,12 @@ def denoise_bi_exponential():
     injected_original_fft = jnp.fft.fftshift(jnp.fft.fft(injected_original))
     injected_denoised_fft = jnp.fft.fftshift(jnp.fft.fft(injected_denoised))
     
-    plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noisy Injected')
-    plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Denoised Injected')
+    
+    plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noise before denoising')
+    plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Noise after denoising')
+    plt.title("Comparison of the noise before and after denoising\nin the frequency domain")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude")
     # plt.plot(jnp.abs(decay_fft), label='Clean')
     plt.legend()
     plt.show()

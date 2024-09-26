@@ -95,6 +95,12 @@ def create_noise_injection(wavelet, mode):
         return injected_denoised
     return noise_injection
 
+# utility function to create a fourier transform loss function
+@jit
+def fft_mse_loss(clean_signal, noisy_signal):
+    clean_fft = jnp.fft.fft(clean_signal)
+    noisy_fft = jnp.fft.fft(noisy_signal)
+    return jnp.mean(jnp.square(clean_fft - noisy_fft))
 
 # Combine the loss functions into a single value
 def create_compute_metrics(wavelet, mode):
@@ -120,6 +126,7 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=8919).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
+        metrics["mse_fft"] = fft_mse_loss(clean_signal, injected_denoised).mean()
         
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
