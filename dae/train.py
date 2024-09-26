@@ -15,13 +15,13 @@ import optax
 import models
 import utils
 import data_processing
-from input_pipeline import create_data_generator
-from loss import create_compute_metrics
+import input_pipeline
+import loss
 
 # Define the training step
 def create_train_step(model_args, data_args):
     
-    get_metrics = create_compute_metrics(data_args["wavelet"], data_args["mode"])
+    get_metrics = loss.create_compute_metrics(data_args["wavelet"], data_args["mode"])
 
     @jax.jit
     def train_step(state, batch, z_rng, dropout_rng):
@@ -53,7 +53,7 @@ def create_train_step(model_args, data_args):
 # Define the evaluation function
 def create_eval_f(model_args, data_args):
     
-    get_metrics = create_compute_metrics(data_args["wavelet"], data_args["mode"])
+    get_metrics = loss.create_compute_metrics(data_args["wavelet"], data_args["mode"])
     
     @jax.jit
     def eval_f(params, batch, z_rng):
@@ -150,7 +150,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Create the data generator
     train_step = create_train_step(model_args, data_args)
     eval_f = create_eval_f(model_args, data_args)
-    data_generator = create_data_generator(data_args)
+    data_generator = input_pipeline.create_data_generator(data_args)
     
     # loss_dict = {
     #     'mse': True, 
@@ -224,30 +224,16 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
         # Print the evaluation metrics
         if (epoch + 1) % 10 == 0:
-            print(
-                f"eval epoch: {epoch + 1}, "
-                f"time {time()-start_time:.2f}s, "
-                f"loss: {metrics['loss']:.4f}, "
-                f"mse_wt: {metrics['mse_wt']:.4f}, "
-                f"mse_t: {metrics['mse_t']:.4f}, "
-                f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
-                f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
-                # f"kl: {metrics['kl']:.8f}, "
-                # f"mae: {metrics['mae']:.8f}, "
-                # f"max: {metrics['max']:.5f}, "
-                # f"huber: {metrics['huber']:.8f}, "
-                # f"log_mse: {metrics['log_mse']:.8f}, "
-                f"l2: {metrics['l2']:.8f}"
-            )
+            loss.print_metrics(epoch, metrics, start_time)
             
         if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
             best_loss = metrics['loss']
-            print(f"New best loss at epoch {epoch + 1}: {best_loss:.4f}")
-            utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args)
+            loss.print_metrics(epoch, metrics, start_time, new_best=True)
+            utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
         # Save the model
         if (epoch + 1) % 100 == 0:
-            utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args, logging=False)
+            utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
             # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             
     # Save the results

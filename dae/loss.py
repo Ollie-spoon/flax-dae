@@ -3,6 +3,7 @@ from jax.debug import print
 import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
+from time import time
 
 # Define the loss functions
 
@@ -107,7 +108,13 @@ def fft_mse_loss(clean_signal, noisy_signal, magnitude_scale, phase_scale):
     noisy_mag = jnp.abs(noisy_fft)
     noisy_phase = jnp.angle(noisy_fft)
     
-    return jnp.mean(jnp.square(clean_mag - noisy_mag))*magnitude_scale, jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
+    mag_mean = jnp.mean(jnp.square(clean_mag - noisy_mag))*magnitude_scale
+    phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
+    
+    mag_max = jnp.max(jnp.abs(clean_mag - noisy_mag))
+    phase_max = jnp.max(jnp.abs(clean_phase - noisy_phase))*phase_scale/magnitude_scale
+    
+    return mag_mean, phase_mean, mag_max, phase_max
 
 # Combine the loss functions into a single value
 def create_compute_metrics(wavelet, mode):
@@ -133,9 +140,11 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=2500).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=160000).mean()
-        mag, phs = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=200, phase_scale=4000000)
-        metrics["mse_fft_m"], metrics["mse_fft_p"] = mag.mean(), phs.mean()
-        
+        mag, phase, mag_max, phase_max = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=160, phase_scale=5000000)
+        metrics["mse_fft_m"] = mag.mean()
+        metrics["mse_fft_p"] = phase.mean()
+        metrics["mse_fft_m_max"] = mag_max.mean()
+        metrics["mse_fft_p_max"] = phase_max.mean()
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
@@ -151,3 +160,23 @@ def create_compute_metrics(wavelet, mode):
         
         return metrics
     return compute_metrics
+
+def print_metrics(epoch, metrics, start_time, new_best=False):
+    print(
+        f"New best loss at epoch {epoch + 1}, " if new_best else f"epoch: {epoch + 1}, ",
+        f"time {time()-start_time:.2f}s, "
+        f"loss: {metrics['loss']:.4f}, "
+        f"mse_wt: {metrics['mse_wt']:.4f}, "
+        f"mse_t: {metrics['mse_t']:.4f}, "
+        f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
+        f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
+        f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
+        f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
+        # f"kl: {metrics['kl']:.8f}, "
+        # f"mae: {metrics['mae']:.8f}, "
+        # f"max: {metrics['max']:.5f}, "
+        # f"huber: {metrics['huber']:.8f}, "
+        # f"log_mse: {metrics['log_mse']:.8f}, "
+        f"l2: {metrics['l2']:.8f}"
+            )
+    
