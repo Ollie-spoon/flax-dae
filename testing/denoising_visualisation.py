@@ -7,6 +7,7 @@ from cr.wavelets import wavedec, waverec, downcoef
 import pickle
 from flax import linen as nn
 import matplotlib.pyplot as plt
+from time import time
 
 import sys
 import os
@@ -19,7 +20,7 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2024)
+    rng = key(2024*int(time()))
     rng, key1, key2, key3, key4 = split(rng, 5)
     
     # Define the test data parameters
@@ -67,7 +68,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_6365_100snr_var.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\thurs_lunch_current_best.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
 
     # Pass approximation coefficients through neural network
@@ -105,11 +106,11 @@ def denoise_bi_exponential():
     print(f"The original SNR of the signal was {1/jnp.std(noisy_decay-decay)}")
     print(f"The denoised signal SNR was {1/jnp.std(denoised_decay-decay)}")
     
-    print(f"mse of denoised approx coefficients: {get_mse_loss(denoised_approx_coeffs, clean_approx)}")
-    print(f"mse of noisy approx coefficients: {get_mse_loss(noisy_approx, clean_approx)}")
+    print(f"mse(wt, noisy): {get_mse_loss(noisy_approx, clean_approx)}")
+    print(f"mse(wt, denoised): {get_mse_loss(denoised_approx_coeffs, clean_approx)}\n")
     
-    print(f"The mse loss for the noisy signal was {get_mse_loss(injected_original, decay)}")
-    print(f"The mse loss for the denoised signal was {get_mse_loss(injected_denoised, decay)}")
+    print(f"mse(t, noisy): {get_mse_loss(injected_original, decay)}")
+    print(f"mse(t, denoised): {get_mse_loss(injected_denoised, decay)}\n")
 
     # # Plot comparison
     # plt.title("Comparison of noisy and denoised signals")
@@ -177,6 +178,12 @@ def denoise_bi_exponential():
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Phase")
     plt.show()
+    
+    print(f"mse(fft_m, noisy): {get_mse_loss(injected_original_fft_mag, decay_fft_mag)}")
+    print(f"mse(fft_m, denoised): {get_mse_loss(injected_denoised_fft_mag, decay_fft_mag)}\n")
+    
+    print(f"mse(fft_p, noisy): {get_mse_loss(injected_original_fft_phase, decay_fft_phase)}")
+    print(f"mse(fft_p, denoised): {get_mse_loss(injected_denoised_fft_phase, decay_fft_phase)}\n")
     
     
     # For this section we are going to test out some interesting things
