@@ -143,13 +143,39 @@ def denoise_bi_exponential():
     injected_denoised_fft = jnp.fft.fftshift(jnp.fft.fft(injected_denoised))
     
     
-    plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noise before denoising')
-    plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Noise after denoising')
-    plt.title("Comparison of the noise before and after denoising\nin the frequency domain")
+    # plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noise before denoising')
+    # plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Noise after denoising')
+    # plt.title("Comparison of the noise before and after denoising\nin the frequency domain")
+    # plt.xlabel("Frequency (Hz)")
+    # plt.ylabel("Amplitude")
+    # # plt.plot(jnp.abs(decay_fft), label='Clean')
+    # plt.legend()
+    # plt.show()
+    
+    # I've realized that the above does not tell the whole picture. 
+    # I need to use the magnitude and the phase separately to get a better idea of what's going on
+    
+    decay_fft_mag = jnp.abs(decay_fft)
+    decay_fft_phase = jnp.angle(decay_fft)
+    
+    injected_original_fft_mag = jnp.abs(injected_original_fft)
+    injected_original_fft_phase = jnp.angle(injected_original_fft)
+    
+    injected_denoised_fft_mag = jnp.abs(injected_denoised_fft)
+    injected_denoised_fft_phase = jnp.angle(injected_denoised_fft)
+    
+    plt.plot((injected_original_fft_mag - decay_fft_mag)[480:640], label='Noise before denoising')
+    plt.plot((injected_denoised_fft_mag - decay_fft_mag)[480:640], label='Noise after denoising')
+    plt.title("Comparison of the noise before and after denoising\nin the magnitude of the frequency domain")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude")
-    # plt.plot(jnp.abs(decay_fft), label='Clean')
-    plt.legend()
+    plt.show()
+    
+    plt.plot((injected_original_fft_phase - decay_fft_phase)[480:640], label='Noise before denoising')
+    plt.plot((injected_denoised_fft_phase - decay_fft_phase)[480:640], label='Noise after denoising')
+    plt.title("Comparison of the noise before and after denoising\nin the phase of the frequency domain")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Phase")
     plt.show()
     
     

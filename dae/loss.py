@@ -95,12 +95,19 @@ def create_noise_injection(wavelet, mode):
         return injected_denoised
     return noise_injection
 
-# utility function to create a fourier transform loss function
+# FFT MSE Loss
 @jit
-def fft_mse_loss(clean_signal, noisy_signal):
+def fft_mse_loss(clean_signal, noisy_signal, magnitude_scale, phase_scale):
     clean_fft = jnp.fft.fft(clean_signal)
     noisy_fft = jnp.fft.fft(noisy_signal)
-    return jnp.mean(jnp.square(clean_fft - noisy_fft))
+    
+    clean_mag = jnp.abs(clean_fft)
+    clean_phase = jnp.angle(clean_fft)
+    
+    noisy_mag = jnp.abs(noisy_fft)
+    noisy_phase = jnp.angle(noisy_fft)
+    
+    return jnp.mean(jnp.square(clean_mag - noisy_mag))*magnitude_scale, jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
 
 # Combine the loss functions into a single value
 def create_compute_metrics(wavelet, mode):
@@ -126,7 +133,8 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=8919).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
-        metrics["mse_fft"] = fft_mse_loss(clean_signal, injected_denoised).mean()
+        mag, phs = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=312.285, phase_scale=22596.8)
+        metrics["mse_fft_m"], metrics["mse_fft_p"] = mag.mean(), phs.mean()
         
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
