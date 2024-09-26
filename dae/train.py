@@ -165,6 +165,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     del init_rng, io_rng
 
     metric_list = []
+    best_loss = jnp.inf
     
     logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
     del time_keeping
@@ -236,6 +237,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 # f"log_mse: {metrics['log_mse']:.8f}, "
                 # f"l2: {metrics['l2']:.8f}"
             )
+            
+        if epoch > config.num_epochs/10 and metrics['loss'] < best_loss:
+            best_loss = metrics['loss']
+            state = utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args)
         
         # Save the model
         if (epoch + 1) % 100 == 0:

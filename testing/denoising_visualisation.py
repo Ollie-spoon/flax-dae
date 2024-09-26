@@ -2,7 +2,7 @@ import jax
 from jax import jit, random
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
-from jax.random import uniform, normal, split, key
+from jax.random import split, key
 from cr.wavelets import wavedec, waverec, downcoef
 import pickle
 from flax import linen as nn
@@ -19,30 +19,55 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2027)
+    rng = key(2020)
     rng, key1, key2, key3, key4 = split(rng, 5)
     
-    t = jnp.linspace(0, 100, 1000)
+    # Define the test data parameters
+    data_args = {
+        "params": {
+            "a1": 0.6, 
+            "a2": 0.4, 
+            "tau1_min": 20, 
+            "tau1_max": 120, 
+            "tau2_min": 80, 
+            "tau2_max": 180,
+        },
+        "t_max": 400, 
+        "t_len": 1120, 
+        "SNR": 100,
+        "wavelet": "coif6", 
+        "mode": "zero",
+        "dtype": jnp.float32,
+    }
+    
+    t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
     a1, a2 = 0.6, 0.4
-    tau1 = uniform(key1, minval=5, maxval=30, shape=())
-    tau2 = uniform(key2, minval=20, maxval=45, shape=())
+    tau1 = random.uniform(key1, 
+                   minval=data_args["params"]["tau1_min"], 
+                   maxval=data_args["params"]["tau1_max"], 
+                   shape=())
+    tau2 = random.uniform(key2, 
+                   minval=data_args["params"]["tau2_min"], 
+                   maxval=data_args["params"]["tau2_max"], 
+                   shape=())
+    tau1, tau2 = 40, 120
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
 
     # Add Gaussian noise
     SNR = 100
     noise_scale = 1/SNR
-    noise = noise_scale * normal(key3, shape=t.shape)
+    noise = noise_scale * random.normal(key3, shape=t.shape)
     noisy_decay = decay + noise
 
     # Wavelet decomposition
     wavelet = 'coif6'
-    mode = 'symmetric'
+    mode = 'zero'
     coeffs = wavedec(noisy_decay, wavelet, mode=mode)
     coeffs_clean = wavedec(decay, wavelet, mode=mode)
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:/Users/omnic/OneDrive/Documents/MIT/Programming/dae/flax/tmp/checkpoints/checkpoint_200.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\wt_loss_only_669520_var.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
 
     # Pass approximation coefficients through neural network
@@ -86,17 +111,18 @@ def denoise_bi_exponential():
     print(f"The mse loss for the noisy signal was {get_mse_loss(injected_original, decay)}")
     print(f"The mse loss for the denoised signal was {get_mse_loss(injected_denoised, decay)}")
 
-    # Plot comparison
-    plt.title("Comparison of noisy and denoised signals")
-    plt.plot(t, noisy_decay - decay, label='Noisy')
-    plt.plot(t, denoised_decay - decay, label='Denoised')
-    plt.xlabel("time (ms)")
-    plt.ylabel("signal amplitude")
-    plt.legend()
-    plt.show()
+    # # Plot comparison
+    # plt.title("Comparison of noisy and denoised signals")
+    # plt.plot(t, noisy_decay - decay, label='Noisy')
+    # plt.plot(t, denoised_decay - decay, label='Denoised')
+    # plt.xlabel("time (ms)")
+    # plt.ylabel("signal amplitude")
+    # plt.legend()
+    # plt.show()
     
     plt.title("Comparison of noisy and denoised approximation coefficient injections")
     plt.plot(t, noisy_decay - decay, label='Noisy')
+    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     plt.plot(t, injected_original - decay, label='Noisy Injected')
     plt.plot(t, injected_denoised - decay, label='Denoised Injected')
     plt.xlabel("time (ms)")
