@@ -1,4 +1,5 @@
-from jax import jit, vmap, tree_util, debug
+from jax import jit, vmap, tree_util
+from jax.debug import print
 import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
@@ -97,9 +98,9 @@ def create_noise_injection(wavelet, mode):
 
 # Combine the loss functions into a single value
 def create_compute_metrics(wavelet, mode):
-    
+
     noise_injection = create_noise_injection(wavelet, mode)
-    
+
     @jit
     def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
 
@@ -129,7 +130,7 @@ def create_compute_metrics(wavelet, mode):
         
         for key, value in metrics.items():
             print(f"key: {key}")
-            debug.print("value: {}", value)
+            print("value: {}", value)
             # print(f"type of {key}: {type(value)}")
         
         metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))

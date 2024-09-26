@@ -19,7 +19,7 @@ from models import model
 def denoise_bi_exponential():
     # Generate bi-exponential decay
     
-    rng = key(2020)
+    rng = key(2021)
     rng, key1, key2, key3, key4 = split(rng, 5)
     
     # Define the test data parameters
@@ -67,7 +67,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\wt_loss_only_669520_var.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_12_100snr_var.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
 
     # Pass approximation coefficients through neural network
@@ -136,6 +136,18 @@ def denoise_bi_exponential():
     
     print(noisy_approx_ish.shape)
     print(noisy_approx.shape)
+    
+    # Now I want to test out what the fourier transform of the noiseless and injected signals looks like
+    decay_fft = jnp.fft.fftshift(jnp.fft.fft(decay))
+    injected_original_fft = jnp.fft.fftshift(jnp.fft.fft(injected_original))
+    injected_denoised_fft = jnp.fft.fftshift(jnp.fft.fft(injected_denoised))
+    
+    plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noisy Injected')
+    plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Denoised Injected')
+    # plt.plot(jnp.abs(decay_fft), label='Clean')
+    plt.legend()
+    plt.show()
+    
     
     # For this section we are going to test out some interesting things
     
