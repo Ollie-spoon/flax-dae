@@ -131,9 +131,9 @@ def create_compute_metrics(wavelet, mode):
         # calculating losses    
         metrics = {}
         
-        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=8919).mean()
-        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=159419).mean()
-        mag, phs = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=312.285, phase_scale=22596.8)
+        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=2500).mean()
+        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=160000).mean()
+        mag, phs = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=150, phase_scale=5000000)
         metrics["mse_fft_m"], metrics["mse_fft_p"] = mag.mean(), phs.mean()
         
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
