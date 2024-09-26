@@ -1,26 +1,22 @@
-from jax import jit, vmap, tree_util
+from jax import jit, vmap, tree_util, debug
 import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
 
+# Define the loss functions
+
+# Mean Squared Error Loss
 @jit
 def get_mse_loss(recon_x, noiseless_x, scale=159419):
     return jnp.mean(jnp.square(recon_x - noiseless_x)) * scale
 
-@vmap
-@jit
-def abs_complex_log10(numbers):
-    # Compute the complex logarithm
-    absolutes = jnp.abs(numbers)  # Adding 0j to ensure complex type
-    negative = (1-numbers/absolutes)
-    # Return the absolute value of the complex logarithm
-    return jnp.log10(absolutes)+negative
-
+# Mean Absolute Error Loss
 @vmap
 @jit
 def get_mae_loss(recon_x, noiseless_x):
     return jnp.mean(jnp.abs(recon_x - noiseless_x))
 
+# Huber Loss
 @vmap
 @jit
 def huber_loss(recon_x, noiseless_x, delta=1.0):
@@ -35,33 +31,41 @@ def huber_loss(recon_x, noiseless_x, delta=1.0):
 def get_huber_loss(recon_x, noiseless_x, delta=1.0):
     return jnp.mean(huber_loss(recon_x, noiseless_x, delta))
 
+# Logarithmic Loss
+@vmap
+@jit
+def abs_complex_log10(numbers):
+    # Compute the complex logarithm
+    absolutes = jnp.abs(numbers)  # Adding 0j to ensure complex type
+    negative = (1-numbers/absolutes)
+    # Return the absolute value of the complex logarithm
+    return jnp.log10(absolutes)+negative
+
 @vmap
 @jit
 def get_log_mse_loss(recon_x, noiseless_x, eps=1e-16):
     return jnp.square(abs_complex_log10(recon_x+eps) - abs_complex_log10(noiseless_x+eps)).mean()
 
+# Maximum Loss
 @vmap
 @jit
 def get_max_loss(recon_x, noiseless_x, scale=72.51828996):
     return jnp.max(jnp.abs(recon_x - noiseless_x))*scale
 
+# L2 Regularization Loss
 @jit
 def get_l2_loss(params, alpha=0.0000001):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
     return alpha * sum(tree_util.tree_leaves(l2_loss))
 
-@vmap
-@jit
-def get_custom_loss(recon_diff, original_diff, alpha=0.002):
-    return alpha * jnp.max([0, 1 - recon_diff/original_diff]).mean()
+# KL Divergence Loss
 
-@vmap
+# KL Divergence Loss for Log-Normal Distribution
 @jit
 def get_kl_divergence_lognorm(mean, logvar):
   return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
 
-
-@vmap
+# KL Divergence Loss for Truncated Normal Distribution
 @jit
 def get_kl_divergence_truncated_normal(mean, logvar):
     # a and b are the lower and upper bounds of the truncated normal distribution
@@ -69,26 +73,14 @@ def get_kl_divergence_truncated_normal(mean, logvar):
            jnp.log(erfc(-mean/jnp.sqrt(jnp.exp(logvar))))
 
 
-# Combine the loss functions into a single value
-def compute_metrics(recon_diff, noiseless_x, noisy_x, model_params):
-        
-    metrics = {}
-    
-    recon_x = noisy_x+recon_diff 
-    
-    metrics["mse"] = get_mse_loss(recon_x, noiseless_x).mean()
-    metrics["max"] = get_max_loss(recon_x, noiseless_x).mean()
-    
-    metrics["l2"] = get_l2_loss(model_params)
-    
-    metrics["loss"] = jnp.sum(value for _, value in metrics)
-    
-    return metrics
-
+# utility function to create noise injection function
 def create_noise_injection(wavelet, mode):
+    
+    # Noise injection function
     @vmap
     @jit
     def noise_injection(recon_x, clean_signal):
+        """ Inject noise into the clean signal via the approximation coefficients from the wavelet decomposition """
         
         # forward wavelet transform
         clean_coeffs = wavedec(clean_signal, wavelet, mode)
@@ -114,7 +106,6 @@ def create_compute_metrics(wavelet, mode):
         # Noise injection/preprocessing
         injected_denoised = noise_injection(recon_approx, clean_signal)
         
-
         # print(f"recon_approx: {recon_approx.shape}")
         # print(f"noisy_approx: {noisy_approx.shape}")
         # print(f"mean: {mean.shape}")
@@ -136,9 +127,10 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["l2"] = get_l2_loss(model_params)
         
-        # for key, value in metrics.items():
-        #     # print(f"{key}: {value}")
-        #     print(f"type of {key}: {type(value)}")
+        for key, value in metrics.items():
+            print(f"key: {key}")
+            debug.print("value: {}", value)
+            # print(f"type of {key}: {type(value)}")
         
         metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
         
