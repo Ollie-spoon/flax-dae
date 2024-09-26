@@ -127,6 +127,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             tx=optax.adam(config.learning_rate),
             opt_state=opt_state,  # Set the optimizer state
         )
+        
+        original_state = jnp.copy(state)
     else:
         model_args = {
             "latents": config.latents,
@@ -249,6 +251,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # Save the model
         if (epoch + 1) % 100 == 0:
             utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
+            state = jnp.copy(original_state)
             # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             
     # Save the results
