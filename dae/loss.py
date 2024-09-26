@@ -98,7 +98,7 @@ def create_noise_injection(wavelet, mode):
 
 # FFT MSE Loss
 @jit
-def fft_mse_loss(clean_signal, noisy_signal, magnitude_scale, phase_scale):
+def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
     clean_fft = jnp.fft.fft(clean_signal)
     noisy_fft = jnp.fft.fft(noisy_signal)
     
@@ -108,11 +108,11 @@ def fft_mse_loss(clean_signal, noisy_signal, magnitude_scale, phase_scale):
     noisy_mag = jnp.abs(noisy_fft)
     noisy_phase = jnp.angle(noisy_fft)
     
-    mag_mean = jnp.mean(jnp.square(clean_mag - noisy_mag))*magnitude_scale
+    mag_mean = jnp.mean(jnp.square(clean_mag - noisy_mag))*mag_scale
     phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
     
-    mag_max = jnp.max(jnp.abs(clean_mag - noisy_mag))
-    phase_max = jnp.max(jnp.abs(clean_phase - noisy_phase))*phase_scale/magnitude_scale
+    mag_max = jnp.max(jnp.abs(clean_mag - noisy_mag))*mag_max_scale
+    phase_max = jnp.max(jnp.abs(clean_phase - noisy_phase))*phase_max_scale
     
     return mag_mean, phase_mean, mag_max, phase_max
 
@@ -140,7 +140,14 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=2500).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=160000).mean()
-        mag, phase, mag_max, phase_max = fft_mse_loss(clean_signal, injected_denoised, magnitude_scale=160, phase_scale=5000000)
+        mag, phase, mag_max, phase_max = fft_mse_loss(
+            clean_signal, 
+            injected_denoised, 
+            mag_scale=160, 
+            phase_scale=5000000,
+            mag_max_scale=2,
+            phase_max_scale=20,
+        )
         metrics["mse_fft_m"] = mag.mean()
         metrics["mse_fft_p"] = phase.mean()
         metrics["mse_fft_m_max"] = mag_max.mean()

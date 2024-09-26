@@ -21,6 +21,7 @@ def denoise_bi_exponential():
     # Generate bi-exponential decay
     
     rng = 2024*int(time())
+    # rng = 3496215516992
     print(f"rng: {rng}")
     rng = key(2024*int(time()))
     rng, key1, key2, key3, key4 = split(rng, 5)
@@ -70,7 +71,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_6365_100snr_var.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\thurs_heavy_phase_max.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:
