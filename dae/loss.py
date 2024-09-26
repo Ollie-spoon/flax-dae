@@ -1,5 +1,5 @@
 from jax import jit, vmap, tree_util
-from jax.debug import jprint
+from jax.debug import print as jprint
 import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec

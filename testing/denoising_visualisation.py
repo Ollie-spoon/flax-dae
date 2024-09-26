@@ -70,8 +70,12 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\thurs_15_current_best.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\68_95_20_0_6365_100snr_var.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
+    
+    # Current favourites:
+    # permanent_saves\thurs_lunch_current_best.pkl: Has excellent phase reduction, but not great magnitude reduction
+    # permanent_saves\68_95_20_0_6365_100snr_var.pkl: best magnitude reduction so far, I think, pretty good phase reduction.
 
     # Pass approximation coefficients through neural network
     noisy_approx = coeffs[0]
