@@ -18,6 +18,27 @@ import data_processing
 import input_pipeline
 import loss
 
+def create_learning_rate_scheduler(config):
+    batches_per_epoch = config.epoch_size / config.batch_size
+    schedule_array = config.learning_rate_schedule
+
+    @jax.jit
+    def learning_rate_schedule(step):
+        # Compute the indices of the schedule array where the step is within the bounds
+        idx = jnp.searchsorted(schedule_array[:, 0] * batches_per_epoch, step)
+
+        # Handle the case where the step is beyond the last schedule point
+        idx = jnp.clip(idx, 0, len(schedule_array) - 2)
+
+        # Compute the learning rate using the formula
+        lr = schedule_array[idx, 1] * (schedule_array[idx + 1, 1] / schedule_array[idx, 1]) ** (
+            (step - schedule_array[idx, 0] * batches_per_epoch) / ((schedule_array[idx + 1, 0] - schedule_array[idx, 0]) * batches_per_epoch)
+        )
+
+        return lr
+
+    return learning_rate_schedule
+
 # Define the training step
 def create_train_step(model_args, data_args):
     
@@ -124,7 +145,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             step=100*10000,  # Restore the step count from opt_state
             apply_fn=models.model(**model_args).apply,
             params=params,
-            tx=optax.adam(config.learning_rate),
+            tx=optax.adam(create_learning_rate_scheduler(config)),
             opt_state=opt_state,  # Set the optimizer state
         )
         
@@ -146,31 +167,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         state = train_state.TrainState.create(
             apply_fn=models.model(**model_args).apply,
             params=params,
-            tx=optax.adam(config.learning_rate),
+            tx=optax.adam(create_learning_rate_scheduler(config)),
         )
         
     # Create the data generator
     train_step = create_train_step(model_args, data_args)
     eval_f = create_eval_f(model_args, data_args)
     data_generator = input_pipeline.create_data_generator(data_args)
-    
-    # loss_dict = {
-    #     'mse': True, 
-    #     'mae': False, 
-    #     'huber': False, 
-    #     'log_mse': False, 
-    #     'max': True, 
-    #     'custom': False, 
-    #     'l2': True, 
-    # }
-    
-    del init_rng, io_rng
 
     metric_list = []
     best_loss = jnp.inf
+    del time_keeping, init_rng, io_rng
     
     logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
-    del time_keeping
     
     logging.info(
         f"This training instance has the following details:\n"
@@ -224,35 +233,35 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         metric_list.append(metrics)
         
-        # Lower the learning rate after 1000 epochs
-        if epoch == 100:
-            state = train_state.TrainState(
-                step=state.step,  # Restore the step count from opt_state
-                apply_fn=state.apply_fn,
-                params=state.params,
-                tx=optax.adam(config.learning_rate/10),
-                opt_state=state.opt_state,  # Set the optimizer state
-            )
+        # # Lower the learning rate after 1000 epochs
+        # if epoch == 100:
+        #     state = train_state.TrainState(
+        #         step=state.step,  # Restore the step count from opt_state
+        #         apply_fn=state.apply_fn,
+        #         params=state.params,
+        #         tx=optax.adam(config.learning_rate/10),
+        #         opt_state=state.opt_state,  # Set the optimizer state
+        #     )
         
-        # Lower the learning rate after 1000 epochs
-        if epoch == 2000:
-            state = train_state.TrainState(
-                step=state.step,  # Restore the step count from opt_state
-                apply_fn=state.apply_fn,
-                params=state.params,
-                tx=optax.adam(config.learning_rate/100),
-                opt_state=state.opt_state,  # Set the optimizer state
-            )
+        # # Lower the learning rate after 1000 epochs
+        # if epoch == 2000:
+        #     state = train_state.TrainState(
+        #         step=state.step,  # Restore the step count from opt_state
+        #         apply_fn=state.apply_fn,
+        #         params=state.params,
+        #         tx=optax.adam(config.learning_rate/100),
+        #         opt_state=state.opt_state,  # Set the optimizer state
+        #     )
         
-        # Lower the learning rate after 1000 epochs
-        if epoch == 7000:
-            state = train_state.TrainState(
-                step=state.step,  # Restore the step count from opt_state
-                apply_fn=state.apply_fn,
-                params=state.params,
-                tx=optax.adam(config.learning_rate/600),
-                opt_state=state.opt_state,  # Set the optimizer state
-            )
+        # # Lower the learning rate after 1000 epochs
+        # if epoch == 7000:
+        #     state = train_state.TrainState(
+        #         step=state.step,  # Restore the step count from opt_state
+        #         apply_fn=state.apply_fn,
+        #         params=state.params,
+        #         tx=optax.adam(config.learning_rate/600),
+        #         opt_state=state.opt_state,  # Set the optimizer state
+        #     )
 
         # Print the evaluation metrics
         if (epoch + 1) % 10 == 0:
