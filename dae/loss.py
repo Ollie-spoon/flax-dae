@@ -88,34 +88,35 @@ def create_noise_injection(wavelet, mode):
         clean_coeffs = wavedec(clean_signal, wavelet, mode)
         
         # Noise injection
+        clean_approx = clean_coeffs[0]
         clean_coeffs[0] = recon_x
         
         # inverse wavelet transform
         injected_denoised = waverec(clean_coeffs, wavelet, mode)
         
-        return injected_denoised
+        return injected_denoised, clean_approx
     return noise_injection
 
 # FFT MSE Loss
 @jit
-def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
+def fft_mse_loss(clean_signal, prediction_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
     clean_fft = jnp.fft.fft(clean_signal)
-    noisy_fft = jnp.fft.fft(noisy_signal)
+    pred_fft = jnp.fft.fft(prediction_signal)
     
     clean_mag = jnp.abs(clean_fft)[0:34]
     clean_phase = jnp.angle(clean_fft)[0:34]
     
-    noisy_mag = jnp.abs(noisy_fft)[0:34]
-    noisy_phase = jnp.angle(noisy_fft)[0:34]
+    pred_mag = jnp.abs(pred_fft)[0:34]
+    pred_phase = jnp.angle(pred_fft)[0:34]
     
     mag_mean = jnp.sqrt(
-        jnp.mean(jnp.square(clean_mag - noisy_mag)) +
-        jnp.mean(jnp.abs(clean_mag - noisy_mag))
+        jnp.mean(jnp.square(clean_mag - pred_mag)) +
+        jnp.mean(jnp.abs(clean_mag - pred_mag))
         )*mag_scale
-    phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
+    phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))*phase_scale
     
-    mag_max = jnp.max(jnp.abs(clean_mag[0:5] - noisy_mag[0:5]))*mag_max_scale
-    phase_max = jnp.max(jnp.abs(clean_phase[0:5] - noisy_phase[0:5]))*phase_max_scale
+    mag_max = jnp.max(jnp.abs(clean_mag - pred_mag))*mag_max_scale
+    phase_max = jnp.max(jnp.abs(clean_phase - pred_phase))*phase_max_scale
     
     return mag_mean, phase_mean, mag_max, phase_max
 
@@ -128,7 +129,7 @@ def create_compute_metrics(wavelet, mode):
     def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
 
         # Noise injection/preprocessing
-        injected_denoised = noise_injection(recon_approx, clean_signal)
+        injected_denoised, clean_approx = noise_injection(recon_approx, clean_signal)
         
         # jprint(f"recon_approx: {recon_approx.shape}")
         # jprint(f"noisy_approx: {noisy_approx.shape}")
@@ -151,11 +152,12 @@ def create_compute_metrics(wavelet, mode):
             "l2": 0.00001,
         }
         
-        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=normal_weights["wt"]/10).mean()
+        metrics["mse_wt"] = get_mse_loss(recon_approx, clean_approx, scale=normal_weights["wt"]/10).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]).mean()
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
+            
             mag_scale=normal_weights["fft_m"],
             phase_scale=normal_weights["fft_p"],
             mag_max_scale=normal_weights["fft_m_max"]/10,
@@ -165,7 +167,7 @@ def create_compute_metrics(wavelet, mode):
         metrics["mse_fft_p"] = phase.mean()
         metrics["mse_fft_m_max"] = mag_max.mean()
         metrics["mse_fft_p_max"] = phase_max.mean()
-        metrics["var_fft_m_max"] = mag_max.std()*10000000
+        # metrics["var_fft_m_max"] = mag_max.std()*10000000
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
@@ -173,9 +175,9 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["l2"] = get_l2_loss(model_params)
         
-        # for key, value in metrics.items():
-        #     jprint(f"key: {key}")
-        #     jprint("value: {}", value)
+        for key, value in metrics.items():
+            jprint(f"key: {key}")
+            jprint("value: {}", value)
         
         metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
         
@@ -193,7 +195,7 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
         f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
         f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
-        f"var_fft_m_max: {metrics['var_fft_m_max']:.8f}, "
+        # f"var_fft_m_max: {metrics['var_fft_m_max']:.8f}, "
         # f"kl: {metrics['kl']:.8f}, "
         # f"mae: {metrics['mae']:.8f}, "
         # f"max: {metrics['max']:.5f}, "

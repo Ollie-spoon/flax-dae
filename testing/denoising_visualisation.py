@@ -54,7 +54,7 @@ def denoise_bi_exponential():
                    minval=data_args["params"]["tau2_min"], 
                    maxval=data_args["params"]["tau2_max"], 
                    shape=())
-    # tau1, tau2 = 40, 120
+    tau1, tau2 = 40, 120
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
     
     print(f"Amplitudes: {a1}, {a2}")
