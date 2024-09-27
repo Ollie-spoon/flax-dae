@@ -177,15 +177,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
     metric_list = []
     best_loss = jnp.inf
-    del time_keeping, init_rng, io_rng
     
     logging.info(f"time taken to initialize: {time()-time_keeping:.3f}s")
-    
     logging.info(
         f"This training instance has the following details:\n"
         f"configs: {config}\n"
         f"data_args: {data_args}\n"
     )
+    del time_keeping, init_rng, io_rng
     
     # Train the model
     # SNR_shift = 10.0

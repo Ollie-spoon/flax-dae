@@ -8,7 +8,7 @@ def get_config():
     """Get the default hyperparameter configuration."""
     config = ml_collections.ConfigDict()
 
-    config.learning_rate = 0.001
+    # config.learning_rate = 0.001
     config.learning_rate_schedule=array([[50, 0.01], [2000, 0.001], [6000, 0.0001], [20000, 0.00001]])
     config.latents = 30
     config.hidden = 125
