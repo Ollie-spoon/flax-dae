@@ -240,7 +240,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 step=state.step,  # Restore the step count from opt_state
                 apply_fn=state.apply_fn,
                 params=state.params,
-                tx=optax.adam(config.learning_rate/25),
+                tx=optax.adam(config.learning_rate/60),
                 opt_state=state.opt_state,  # Set the optimizer state
             )
 
