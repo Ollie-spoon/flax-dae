@@ -21,9 +21,11 @@ def denoise_bi_exponential():
     # Generate bi-exponential decay
     
     rng = 2024*int(time())
+    # rng = 3496389595160
     # rng = 3496215516992
+    rng = 3496390746816
     print(f"rng: {rng}")
-    rng = key(2024*int(time()))
+    rng = key(rng)
     rng, key1, key2, key3, key4 = split(rng, 5)
     
     # Define the test data parameters
@@ -99,14 +101,14 @@ def denoise_bi_exponential():
     
 
     # Inverse wavelet decomposition with denoised approximation coefficients
-    plt.title("Comparison of noisy and denoised approximation coefficients.")
-    # plt.plot(coeffs[0], label='Noisy')
-    plt.plot(denoised_approx_coeffs, label='Denoised')
-    plt.plot(clean_approx, label='Clean')
-    plt.xlabel("index")
-    plt.ylabel("coefficient amplitude")
-    plt.legend()
-    plt.show()
+    # plt.title("Comparison of noisy and denoised approximation coefficients.")
+    # # plt.plot(coeffs[0], label='Noisy')
+    # plt.plot(denoised_approx_coeffs, label='Denoised')
+    # plt.plot(clean_approx, label='Clean')
+    # plt.xlabel("index")
+    # plt.ylabel("coefficient amplitude")
+    # plt.legend()
+    # plt.show()
     
     coeffs[0] = denoised_approx_coeffs
     denoised_decay = waverec(coeffs, wavelet, mode=mode)
@@ -187,6 +189,7 @@ def denoise_bi_exponential():
     plt.title("Comparison of the noise before and after denoising\nin the magnitude of the fourier transform")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude")
+    plt.legend()
     plt.show()
     
     plt.plot((injected_original_fft_phase - decay_fft_phase)[520:600], label='Noise before denoising')
@@ -194,6 +197,7 @@ def denoise_bi_exponential():
     plt.title("Comparison of the noise before and after denoising\nin the phase of the fourier transform")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Phase")
+    plt.legend()
     plt.show()
     
     print(f"mse(fft_m, noisy): {get_mse_loss(injected_original_fft_mag, decay_fft_mag)}")

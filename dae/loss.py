@@ -143,12 +143,12 @@ def create_compute_metrics(wavelet, mode):
         metrics = {}
         
         normal_weights = {
-            "wt": 20000,
-            "t": 300000,
+            "wt": 22500,
+            "t": 450000,
             "fft_m": 6,
-            "fft_p": 4000000,
+            "fft_p": 3000000,
             "fft_m_max": 0.3,
-            "fft_p_max": 300.0,
+            "fft_p_max": 100.0,
             "l2": 0.00001,
         }
         
@@ -173,7 +173,7 @@ def create_compute_metrics(wavelet, mode):
         
         # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
         
-        metrics["l2"] = get_l2_loss(model_params)
+        metrics["l2"] = get_l2_loss(model_params)/2
         
         # for key, value in metrics.items():
         #     jprint(f"key: {key}")
