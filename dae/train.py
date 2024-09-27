@@ -225,7 +225,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         metric_list.append(metrics)
         
         # Lower the learning rate after 1000 epochs
-        if epoch == 2000:
+        if epoch == 100:
             state = train_state.TrainState(
                 step=state.step,  # Restore the step count from opt_state
                 apply_fn=state.apply_fn,
@@ -235,12 +235,22 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             )
         
         # Lower the learning rate after 1000 epochs
-        if epoch == 6000:
+        if epoch == 2000:
             state = train_state.TrainState(
                 step=state.step,  # Restore the step count from opt_state
                 apply_fn=state.apply_fn,
                 params=state.params,
-                tx=optax.adam(config.learning_rate/60),
+                tx=optax.adam(config.learning_rate/100),
+                opt_state=state.opt_state,  # Set the optimizer state
+            )
+        
+        # Lower the learning rate after 1000 epochs
+        if epoch == 7000:
+            state = train_state.TrainState(
+                step=state.step,  # Restore the step count from opt_state
+                apply_fn=state.apply_fn,
+                params=state.params,
+                tx=optax.adam(config.learning_rate/600),
                 opt_state=state.opt_state,  # Set the optimizer state
             )
 
