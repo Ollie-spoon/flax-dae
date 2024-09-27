@@ -46,14 +46,14 @@ def denoise_bi_exponential():
     
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
     a1, a2 = 0.6, 0.4
-    # tau1 = random.uniform(key1, 
-    #                minval=data_args["params"]["tau1_min"], 
-    #                maxval=data_args["params"]["tau1_max"], 
-    #                shape=())
-    # tau2 = random.uniform(key2, 
-    #                minval=data_args["params"]["tau2_min"], 
-    #                maxval=data_args["params"]["tau2_max"], 
-    #                shape=())
+    tau1 = random.uniform(key1, 
+                   minval=data_args["params"]["tau1_min"], 
+                   maxval=data_args["params"]["tau1_max"], 
+                   shape=())
+    tau2 = random.uniform(key2, 
+                   minval=data_args["params"]["tau2_min"], 
+                   maxval=data_args["params"]["tau2_max"], 
+                   shape=())
     tau1, tau2 = 40, 120
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
     
@@ -74,12 +74,14 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\wt_loss_only_669520_var.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\thurs_night_trio_joat.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:
     # permanent_saves\thurs_lunch_current_best.pkl: Has excellent phase reduction, but not great magnitude reduction
     # permanent_saves\68_95_20_0_6365_100snr_var.pkl: best magnitude reduction so far, I think, pretty good phase reduction.
+    # permanent_saves\thurs_19_latent_30.pkl: Pretty good, but I'm not sure if it's the best.
+    # permanent_saves\fft_m_max.pkl: 
 
     # Pass approximation coefficients through neural network
     noisy_approx = coeffs[0]
@@ -118,9 +120,11 @@ def denoise_bi_exponential():
     
     print(f"mse(wt, noisy): {get_mse_loss(noisy_approx, clean_approx)}")
     print(f"mse(wt, denoised): {get_mse_loss(denoised_approx_coeffs, clean_approx)}\n")
+    print(f"mse ratio: {get_mse_loss(denoised_approx_coeffs, clean_approx)/get_mse_loss(noisy_approx, clean_approx)}")
     
     print(f"mse(t, noisy): {get_mse_loss(injected_original, decay)}")
     print(f"mse(t, denoised): {get_mse_loss(injected_denoised, decay)}\n")
+    print(f"mse ratio: {get_mse_loss(injected_denoised, decay)/get_mse_loss(injected_original, decay)}")
 
     # # Plot comparison
     # plt.title("Comparison of noisy and denoised signals")
@@ -154,8 +158,8 @@ def denoise_bi_exponential():
     injected_denoised_fft = jnp.fft.fftshift(jnp.fft.fft(injected_denoised))
     
     
-    # plt.plot(jnp.abs(injected_original_fft-decay_fft)[480:640], label='Noise before denoising')
-    # plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[480:640], label='Noise after denoising')
+    # plt.plot(jnp.abs(injected_original_fft-decay_fft)[520:600], label='Noise before denoising')
+    # plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[520:600], label='Noise after denoising')
     # plt.title("Comparison of the noise before and after denoising\nin the frequency domain")
     # plt.xlabel("Frequency (Hz)")
     # plt.ylabel("Amplitude")
@@ -175,16 +179,16 @@ def denoise_bi_exponential():
     injected_denoised_fft_mag = jnp.abs(injected_denoised_fft)
     injected_denoised_fft_phase = jnp.angle(injected_denoised_fft)
     
-    plt.plot((injected_original_fft_mag - decay_fft_mag)[480:640], label='Noise before denoising')
-    plt.plot((injected_denoised_fft_mag - decay_fft_mag)[480:640], label='Noise after denoising')
-    plt.title("Comparison of the noise before and after denoising\nin the magnitude of the frequency domain")
+    plt.plot((injected_original_fft_mag - decay_fft_mag)[520:600], label='Noise before denoising')
+    plt.plot((injected_denoised_fft_mag - decay_fft_mag)[520:600], label='Noise after denoising')
+    plt.title("Comparison of the noise before and after denoising\nin the magnitude of the fourier transform")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude")
     plt.show()
     
-    plt.plot((injected_original_fft_phase - decay_fft_phase)[480:640], label='Noise before denoising')
-    plt.plot((injected_denoised_fft_phase - decay_fft_phase)[480:640], label='Noise after denoising')
-    plt.title("Comparison of the noise before and after denoising\nin the phase of the frequency domain")
+    plt.plot((injected_original_fft_phase - decay_fft_phase)[520:600], label='Noise before denoising')
+    plt.plot((injected_denoised_fft_phase - decay_fft_phase)[520:600], label='Noise after denoising')
+    plt.title("Comparison of the noise before and after denoising\nin the phase of the fourier transform")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Phase")
     plt.show()

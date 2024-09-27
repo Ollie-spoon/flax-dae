@@ -114,8 +114,8 @@ def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_sca
         )*mag_scale
     phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
     
-    mag_max = jnp.max(jnp.abs(clean_mag - noisy_mag))*mag_max_scale
-    phase_max = jnp.max(jnp.abs(clean_phase - noisy_phase))*phase_max_scale
+    mag_max = jnp.mean(jnp.abs(clean_mag[0:1] - noisy_mag[0:1]))*mag_max_scale
+    phase_max = jnp.mean(jnp.abs(clean_phase[0:1] - noisy_phase[0:1]))*phase_max_scale
     
     return mag_mean, phase_mean, mag_max, phase_max
 
@@ -141,15 +141,15 @@ def create_compute_metrics(wavelet, mode):
         # calculating losses    
         metrics = {}
         
-        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=2500).mean()
+        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=500).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=300000).mean()
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
             mag_scale=6,
             phase_scale=4000000,
-            mag_max_scale=0.5,
-            phase_max_scale=10,
+            mag_max_scale=0.025,
+            phase_max_scale=0.5,
         )
         metrics["mse_fft_m"] = mag.mean()
         metrics["mse_fft_p"] = phase.mean()
@@ -180,8 +180,8 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"mse_t: {metrics['mse_t']:.4f}, "
         f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
-        # f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
-        # f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
+        f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
+        f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
         # f"kl: {metrics['kl']:.8f}, "
         # f"mae: {metrics['mae']:.8f}, "
         # f"max: {metrics['max']:.5f}, "
