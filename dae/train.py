@@ -226,13 +226,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         # Lower the learning rate after 1000 epochs
         if epoch == 1000:
-            state = train_state.TrainState(
-                step=state.step,  # Restore the step count from opt_state
-                apply_fn=state.apply_fn,
-                params=state.params,
-                tx=optax.adam(config.learning_rate/10),
-                opt_state=state.opt_state,  # Set the optimizer state
-            )
+            state.tx = optax.adam(config.learning_rate/10)
+        
+        # Lower the learning rate after 1000 epochs
+        if epoch == 5000:
+            state.tx = optax.adam(config.learning_rate/25)
 
         # Print the evaluation metrics
         if (epoch + 1) % 10 == 0:

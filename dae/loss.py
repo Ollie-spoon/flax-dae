@@ -165,7 +165,7 @@ def create_compute_metrics(wavelet, mode):
         metrics["mse_fft_p"] = phase.mean()
         metrics["mse_fft_m_max"] = mag_max.mean()
         metrics["mse_fft_p_max"] = phase_max.mean()
-        metrics["var_fft_m_max"] = mag_max.var()*10
+        metrics["var_fft_m_max"] = mag_max.var()*100000
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
