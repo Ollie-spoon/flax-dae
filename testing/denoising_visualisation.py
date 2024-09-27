@@ -157,6 +157,9 @@ def denoise_bi_exponential():
     injected_original_fft = jnp.fft.fftshift(jnp.fft.fft(injected_original))
     injected_denoised_fft = jnp.fft.fftshift(jnp.fft.fft(injected_denoised))
     
+    plt.plot(jnp.fft.fft(decay))
+    plt.show()
+    
     
     # plt.plot(jnp.abs(injected_original_fft-decay_fft)[520:600], label='Noise before denoising')
     # plt.plot(jnp.abs(injected_denoised_fft-decay_fft)[520:600], label='Noise after denoising')
