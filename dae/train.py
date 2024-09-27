@@ -267,22 +267,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
-        # if epoch > config.num_epochs/20 and metrics['loss'] < best_loss:
-        if metrics['loss'] < best_loss:
-            current_loss = metrics['loss']
+        if epoch > config.num_epochs/15 and metrics['loss'] < best_loss:
+        # if metrics['loss'] < best_loss:
             
             # Create a validation data set 
             rng, test_rng, z_rng = random.split(rng, 3)
             test_batch = next(data_generator(
                 key=test_rng, 
-                n=config.batch_size
+                n=config.batch_size*5
             ))
             metrics = eval_f(state.params, test_batch, z_rng)
             
-            current_loss = jnp.maximum(metrics['loss'], current_loss)
-            
-            if current_loss < best_loss:
-                best_loss = current_loss
+            if metrics['loss'] < best_loss:
+                best_loss = metrics['loss']
                 loss.print_metrics(epoch, metrics, start_time, new_best=True)
                 utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
