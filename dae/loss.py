@@ -188,7 +188,7 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"time {time()-start_time:.2f}s, "
         f"loss: {metrics['loss']:.4f}, "
         f"mse_wt: {metrics['mse_wt']:.4f}, "
-        f"mse_t: {metrics['mse_t']:.4f}, "
+        # f"mse_t: {metrics['mse_t']:.4f}, "
         f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
         f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
