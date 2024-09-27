@@ -1,4 +1,5 @@
 from jax import jit, vmap, tree_util
+from jax.nn import relu as ReLU
 from jax.debug import print as jprint
 import jax.numpy as jnp
 from jax.scipy.special import erfc
@@ -81,7 +82,7 @@ def create_noise_injection(wavelet, mode):
     # Noise injection function
     @vmap
     @jit
-    def noise_injection(recon_x, clean_signal):
+    def noise_injection(denoised_approx, noisy_approx, clean_signal):
         """ Inject noise into the clean signal via the approximation coefficients from the wavelet decomposition """
         
         # forward wavelet transform
@@ -89,25 +90,33 @@ def create_noise_injection(wavelet, mode):
         
         # Noise injection
         clean_approx = clean_coeffs[0]
-        clean_coeffs[0] = recon_x
+        clean_coeffs[0] = denoised_approx
         
         # inverse wavelet transform
         injected_denoised = waverec(clean_coeffs, wavelet, mode)
         
-        return injected_denoised, clean_approx
+        clean_coeffs[0] = noisy_approx
+        
+        injected_noisy = waverec(clean_coeffs, wavelet, mode)
+        
+        return injected_denoised, injected_noisy, clean_approx
     return noise_injection
 
 # FFT MSE Loss
 @jit
-def fft_mse_loss(clean_signal, prediction_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
+def fft_mse_loss(clean_signal, prediction_signal, noisy_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
     clean_fft = jnp.fft.fft(clean_signal)
     pred_fft = jnp.fft.fft(prediction_signal)
+    noisy_fft = jnp.fft.fft(noisy_signal)
     
-    clean_mag = jnp.abs(clean_fft)[0:34]
-    clean_phase = jnp.angle(clean_fft)[0:34]
+    clean_mag = jnp.abs(clean_fft)[0:68]
+    clean_phase = jnp.angle(clean_fft)[0:68]
     
-    pred_mag = jnp.abs(pred_fft)[0:34]
-    pred_phase = jnp.angle(pred_fft)[0:34]
+    pred_mag = jnp.abs(pred_fft)[0:68]
+    pred_phase = jnp.angle(pred_fft)[0:68]
+    
+    noisy_mag = jnp.abs(noisy_fft)[0:68]
+    noisy_phase = jnp.angle(noisy_fft)[0:68]
     
     mag_mean = jnp.sqrt(
         jnp.mean(jnp.square(clean_mag - pred_mag)) +
@@ -115,8 +124,11 @@ def fft_mse_loss(clean_signal, prediction_signal, mag_scale, phase_scale, mag_ma
         )*mag_scale
     phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))*phase_scale
     
-    mag_max = jnp.max(jnp.abs(clean_mag - pred_mag))*mag_max_scale
-    phase_max = jnp.max(jnp.abs(clean_phase - pred_phase))*phase_max_scale
+    mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
+    phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
+    
+    # mag_max = jnp.max(jnp.abs(clean_mag - pred_mag))*mag_max_scale
+    # phase_max = jnp.max(jnp.abs(clean_phase - pred_phase))*phase_max_scale
     
     return mag_mean, phase_mean, mag_max, phase_max
 
@@ -129,7 +141,7 @@ def create_compute_metrics(wavelet, mode):
     def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
 
         # Noise injection/preprocessing
-        injected_denoised, clean_approx = noise_injection(recon_approx, clean_signal)
+        injected_denoised, injected_noisy, clean_approx = noise_injection(recon_approx, noisy_approx, clean_signal)
         
         # jprint(f"recon_approx: {recon_approx.shape}")
         # jprint(f"noisy_approx: {noisy_approx.shape}")
@@ -152,12 +164,12 @@ def create_compute_metrics(wavelet, mode):
             "l2": 0.00001,
         }
         
-        metrics["mse_wt"] = get_mse_loss(recon_approx, clean_approx, scale=normal_weights["wt"]/10).mean()
+        metrics["mse_wt"] = get_mse_loss(recon_approx, clean_approx, scale=normal_weights["wt"]/1000).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]).mean()
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
-            
+            injected_noisy,
             mag_scale=normal_weights["fft_m"],
             phase_scale=normal_weights["fft_p"],
             mag_max_scale=normal_weights["fft_m_max"]/10,
