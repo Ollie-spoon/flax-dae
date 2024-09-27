@@ -128,7 +128,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             opt_state=opt_state,  # Set the optimizer state
         )
         
-        # original_state = state
+        original_state = state
     else:
         model_args = {
             "latents": config.latents,
@@ -245,7 +245,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             )
 
         # Print the evaluation metrics
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 10 == 0:
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
@@ -271,7 +271,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # Save the model
         if (epoch + 1) % 100 == 0:
             utils.save_model(state, epoch + 1, working_dir + 'tmp/checkpoints', model_args)
-            # state = original_state
+            state = original_state
             # utils.plot_comparison(comparison, epoch+1, working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             
     # Save the results
