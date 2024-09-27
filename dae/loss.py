@@ -114,8 +114,8 @@ def fft_mse_loss(clean_signal, noisy_signal, mag_scale, phase_scale, mag_max_sca
         )*mag_scale
     phase_mean = jnp.mean(jnp.square(clean_phase - noisy_phase))*phase_scale
     
-    mag_max = jnp.mean(jnp.abs(clean_mag[0:1] - noisy_mag[0:1]))*mag_max_scale
-    phase_max = jnp.mean(jnp.abs(clean_phase[0:1] - noisy_phase[0:1]))*phase_max_scale
+    mag_max = jnp.max(jnp.abs(clean_mag[0:5] - noisy_mag[0:5]))*mag_max_scale
+    phase_max = jnp.max(jnp.abs(clean_phase[0:5] - noisy_phase[0:5]))*phase_max_scale
     
     return mag_mean, phase_mean, mag_max, phase_max
 
@@ -141,20 +141,31 @@ def create_compute_metrics(wavelet, mode):
         # calculating losses    
         metrics = {}
         
-        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=500).mean()
-        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=300000).mean()
+        normal_weights = {
+            "wt": 3500,
+            "t": 300000,
+            "fft_m": 6,
+            "fft_p": 4000000,
+            "fft_m_max": 10.0,
+            "fft_p_max": 500.0,
+            "l2": 0.00001,
+        }
+        
+        metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=normal_weights["wt"]/10).mean()
+        # metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]/10).mean()
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
-            mag_scale=6,
-            phase_scale=4000000,
-            mag_max_scale=1.0,
-            phase_max_scale=50.0,
+            mag_scale=normal_weights["fft_m"],
+            phase_scale=normal_weights["fft_p"],
+            mag_max_scale=normal_weights["fft_m_max"]/10,
+            phase_max_scale=normal_weights["fft_p_max"]/10,
         )
         metrics["mse_fft_m"] = mag.mean()
         metrics["mse_fft_p"] = phase.mean()
         metrics["mse_fft_m_max"] = mag_max.mean()
         metrics["mse_fft_p_max"] = phase_max.mean()
+        metrics["var_fft_m_max"] = mag_max.var()*10
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
@@ -182,6 +193,7 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
         f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
         f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
+        f"var_fft_m_max: {metrics['var_fft_m_max']:.4f}, "
         # f"kl: {metrics['kl']:.8f}, "
         # f"mae: {metrics['mae']:.8f}, "
         # f"max: {metrics['max']:.5f}, "
