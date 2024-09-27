@@ -159,8 +159,8 @@ def create_compute_metrics(wavelet, mode):
             "t": 450000,
             "fft_m": 6,
             "fft_p": 3000000,
-            "fft_m_max": 0.3,
-            "fft_p_max": 100.0,
+            "fft_m_max": 0.00003,
+            "fft_p_max": 0.02,
             "l2": 0.00001,
         }
         
