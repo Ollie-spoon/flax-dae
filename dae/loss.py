@@ -175,9 +175,9 @@ def create_compute_metrics(wavelet, mode):
         
         metrics["l2"] = get_l2_loss(model_params)
         
-        for key, value in metrics.items():
-            jprint(f"key: {key}")
-            jprint("value: {}", value)
+        # for key, value in metrics.items():
+        #     jprint(f"key: {key}")
+        #     jprint("value: {}", value)
         
         metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
         
