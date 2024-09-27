@@ -152,7 +152,7 @@ def create_compute_metrics(wavelet, mode):
         }
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, noisy_approx, scale=normal_weights["wt"]/10).mean()
-        # metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]/10).mean()
+        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]).mean()
         mag, phase, mag_max, phase_max = fft_mse_loss(
             clean_signal, 
             injected_denoised, 
@@ -165,7 +165,7 @@ def create_compute_metrics(wavelet, mode):
         metrics["mse_fft_p"] = phase.mean()
         metrics["mse_fft_m_max"] = mag_max.mean()
         metrics["mse_fft_p_max"] = phase_max.mean()
-        metrics["var_fft_m_max"] = mag_max.var()*100000
+        metrics["var_fft_m_max"] = mag_max.std()*10000000
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
         
@@ -188,12 +188,12 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"time {time()-start_time:.2f}s, "
         f"loss: {metrics['loss']:.4f}, "
         f"mse_wt: {metrics['mse_wt']:.4f}, "
-        # f"mse_t: {metrics['mse_t']:.4f}, "
+        f"mse_t: {metrics['mse_t']:.4f}, "
         f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
         f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
         f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
-        f"var_fft_m_max: {metrics['var_fft_m_max']:.4f}, "
+        f"var_fft_m_max: {metrics['var_fft_m_max']:.8f}, "
         # f"kl: {metrics['kl']:.8f}, "
         # f"mae: {metrics['mae']:.8f}, "
         # f"max: {metrics['max']:.5f}, "
