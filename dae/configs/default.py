@@ -10,8 +10,8 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([[50, 0.025], [2000, 0.001], [6000, 0.0001], [20000, 0.00005]])
-    config.latents = 30
-    config.hidden = 125
+    config.latents = 40
+    config.hidden = 150
     config.dropout_rate = 0.2
     config.io_dim = 68
     config.batch_size = 1000
