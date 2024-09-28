@@ -278,8 +278,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             ))
             metrics = eval_f(state.params, test_batch, z_rng)
             
-            if metrics['loss'] < best_loss:
-                best_loss = metrics['loss']
+            test_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
+            
+            if test_loss < best_loss:
+                best_loss = test_loss
                 loss.print_metrics(epoch, metrics, start_time, new_best=True)
                 utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         

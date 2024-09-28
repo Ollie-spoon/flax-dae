@@ -14,9 +14,8 @@ def get_config():
         [10, 0.01],
         [400, 0.01], 
         [2000, 0.001*scale], 
-        [20000, 0.0075*scale], 
-        # [6000, 0.0001*scale], 
-        # [20000, 0.00005*scale],
+        [6000, 0.0001*scale], 
+        [20000, 0.00005*scale],
     ])
     config.latents = 32
     config.hidden = 150
