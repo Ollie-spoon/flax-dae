@@ -3,13 +3,19 @@
 import ml_collections
 from jax.numpy import array
 
+scale = 4
 
 def get_config():
     """Get the default hyperparameter configuration."""
     config = ml_collections.ConfigDict()
 
     # config.learning_rate = 0.001
-    config.learning_rate_schedule=array([[50, 0.025], [2000, 0.001], [6000, 0.0001], [20000, 0.00005]])
+    config.learning_rate_schedule=array([
+        [500, 0.01*scale], 
+        [2000, 0.001*scale], 
+        [6000, 0.0001*scale], 
+        [20000, 0.00005*scale],
+    ])
     config.latents = 40
     config.hidden = 150
     config.dropout_rate = 0.2
