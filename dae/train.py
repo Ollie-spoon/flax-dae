@@ -232,7 +232,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         metric_list.append(metrics)
 
         # Print the evaluation metrics
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 1 == 0:
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
