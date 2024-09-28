@@ -3,7 +3,7 @@
 import ml_collections
 from jax.numpy import array
 
-scale = 2
+scale = 0.02
 
 def get_config():
     """Get the default hyperparameter configuration."""
@@ -11,8 +11,7 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [10, 0.01],
-        [400, 0.01], 
+        [10, 0.01], 
         [2000, 0.001*scale], 
         [6000, 0.0001*scale], 
         [20000, 0.00005*scale],
