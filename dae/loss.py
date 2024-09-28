@@ -177,8 +177,8 @@ def create_compute_metrics(wavelet, mode):
         )
         metrics["mse_fft_m"] = mag.mean()
         metrics["mse_fft_p"] = phase.mean()
-        metrics["mse_fft_m_max"] = mag_max.mean()
-        metrics["mse_fft_p_max"] = phase_max.mean()
+        # metrics["mse_fft_m_max"] = mag_max.mean()
+        # metrics["mse_fft_p_max"] = phase_max.mean()
         # metrics["var_fft_m_max"] = mag_max.std()*10000000
         # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
@@ -205,8 +205,8 @@ def print_metrics(epoch, metrics, start_time, new_best=False):
         f"mse_t: {metrics['mse_t']:.4f}, "
         f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
         f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
-        f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
-        f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
+        # f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
+        # f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
         # f"var_fft_m_max: {metrics['var_fft_m_max']:.8f}, "
         # f"kl: {metrics['kl']:.8f}, "
         # f"mae: {metrics['mae']:.8f}, "
