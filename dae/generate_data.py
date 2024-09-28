@@ -22,15 +22,15 @@ def create_wavelet_approx(wavelet, mode, max_dwt_level):
     return jax.jit(wavelet_approx)
 
 # JIT compile and parallelize single data generation
-def create_generate_single_data(t, noise_power, wavelet, mode, max_dwt_level):
+def create_generate_single_data(t, wavelet, mode, max_dwt_level):
     
     multi_exponential_decay = create_multi_exponential_decay(t)
-    wavelet_decomposition = create_wavelet_decomposition(wavelet, mode)
+    # wavelet_decomposition = create_wavelet_decomposition(wavelet, mode)
     wavelet_approx = create_wavelet_approx(wavelet, mode, max_dwt_level)
     
     # Efficient noise generation inside the JIT function
     @jax.jit
-    def generate_single_data(key, params):
+    def generate_single_data(key, params, noise_power):
         clean_signal = multi_exponential_decay(params)
         noisy_signal = clean_signal + noise_power * jax.random.normal(key, shape=t.shape)
         # noisy_signal = clean_signal + noise_power * jax.random.laplace(key, shape=t.shape)
@@ -67,26 +67,57 @@ def create_generate_basic_data(
     
     # Use linspace directly in JAX with dtype
     t = jnp.linspace(0, t_max, t_len, dtype=dtype)
-    noise_power = (params["a1"] + params["a2"]) / SNR
-    generate_single_data = create_generate_single_data(t, noise_power, wavelet, mode, max_dwt_level)
-    batched_generate = jax.vmap(generate_single_data, in_axes=(0, 1))
+    generate_single_data = create_generate_single_data(t, wavelet, mode, max_dwt_level)
+    batched_generate = jax.vmap(generate_single_data, in_axes=(0, 0, 0))
     
     def generate_basic_data(key, iterations):
         # Generate random tau values for all iterations (inside JIT context)
-        key, key1, key2 = jax.random.split(key, 3)
+        key, key_amp, key_ampsum, key_tau, key_noise = jax.random.split(key, 5)
         
-        param_array = jnp.array([
-            generate_params_array(0.0, iterations, params["a1"], params["a1"]),
-            generate_params_array(key1, iterations, params["tau1_min"], params["tau1_max"]),
-            generate_params_array(0.0, iterations, params["a2"], params["a2"]),
-            generate_params_array(key2, iterations, params["tau2_min"], params["tau2_max"]),
-        ])
-
-        # Use vmap to parallelize over iterations, ensuring efficient batching
-        rng_keys = jax.random.split(key, iterations)
+        amplitudes = jax.random.dirichlet(
+            key=key_amp,
+            alpha=jnp.ones(params["decay_count"]),
+            shape=(iterations,),
+            dtype=dtype,
+        )
+        
+        # Generate random amplitude sums for each iteration
+        amp_sum = jax.random.gamma(
+            key=key_ampsum, 
+            a=2.0,
+            shape=(iterations,), 
+            dtype=dtype,
+        ) / 2 + 0.5
+        
+        # Combine the amplitudes and amplitude sums
+        amplitudes = amplitudes * amp_sum[:, None]
+        
+        decay_constants = jax.random.uniform(
+            key=key_tau,
+            shape=(iterations, params["decay_count"]),
+            minval=params["tau_min"],
+            maxval=params["tau_max"],
+            dtype=dtype,
+        )
+        
+        param_array = jnp.empty((iterations, 2*params["decay_count"]), dtype=dtype)
+        param_array = param_array.at[:, ::2].set(amplitudes)
+        param_array = param_array.at[:, 1::2].set(decay_constants)
+        
+        jax.debug.print("param_array.shape: {}", param_array.shape)
+        
+        SNR_array = (jax.random.normal(
+            key=key_noise, 
+            shape=(iterations,), 
+            dtype=dtype,
+        ) / 10.0 + 1.0) * SNR
+        
+        noise_power_array = amp_sum / SNR_array
+        
+        keys = jax.random.split(key, iterations)
         
         # Return the dataset as a JAX array (already the default dtype for jnp arrays)
-        dataset = batched_generate(rng_keys, param_array)
+        dataset = batched_generate(keys, param_array, noise_power_array)
         
         return dataset
     

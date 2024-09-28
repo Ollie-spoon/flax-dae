@@ -17,8 +17,8 @@ def get_config():
         [6000, 0.0001*scale], 
         [20000, 0.00005*scale],
     ])
-    config.latents = 32
-    config.hidden = 150
+    config.latents = 20
+    config.hidden = 48
     config.dropout_rate = 0.2
     config.io_dim = 68
     config.batch_size = 1000

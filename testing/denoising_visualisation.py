@@ -23,10 +23,10 @@ def denoise_bi_exponential():
     rng = 2024*int(time())
     # rng = 3496389595160
     # rng = 3496215516992
-    rng = 3496390746816
+    # rng = 3496390746816
     print(f"rng: {rng}")
     rng = key(rng)
-    rng, key1, key2, key3, key4 = split(rng, 5)
+    rng, key1, key2, key3, key4, key5, key6 = split(rng, 7)
     
     # Define the test data parameters
     data_args = {
@@ -37,6 +37,8 @@ def denoise_bi_exponential():
             "tau1_max": 120, 
             "tau2_min": 80, 
             "tau2_max": 180,
+            "tau3_min": 20, 
+            "tau3_max": 180,
         },
         "t_max": 400, 
         "t_len": 1120, 
@@ -47,7 +49,11 @@ def denoise_bi_exponential():
     }
     
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
-    a1, a2 = 0.6, 0.4
+    amp = random.uniform(key6, 
+                   minval=0, 
+                   maxval=1, 
+                   shape=(3, ))
+    a1, a2, a3 = amp / jnp.sum(amp)
     tau1 = random.uniform(key1, 
                    minval=data_args["params"]["tau1_min"], 
                    maxval=data_args["params"]["tau1_max"], 
@@ -56,11 +62,15 @@ def denoise_bi_exponential():
                    minval=data_args["params"]["tau2_min"], 
                    maxval=data_args["params"]["tau2_max"], 
                    shape=())
-    tau1, tau2 = 40, 120
-    decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)
+    tau3 = random.uniform(key5, 
+                   minval=data_args["params"]["tau3_min"], 
+                   maxval=data_args["params"]["tau3_max"], 
+                   shape=())
+    # tau1, tau2 = 20, 180
+    decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2) + a3 * jnp.exp(-t/tau3)
     
-    print(f"Amplitudes: {a1}, {a2}")
-    print(f"Decay constants: {tau1}, {tau2}")
+    print(f"Amplitudes: {a1}, {a2}, {a3}")
+    print(f"Decay constants: {tau1}, {tau2}, {tau3}")
 
     # Add Gaussian noise
     SNR = 100
@@ -76,7 +86,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\fri_15_maybe.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\in_question_0_5258.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:

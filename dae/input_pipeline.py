@@ -2,17 +2,17 @@
 
 import jax
 import jax.numpy as jnp
-from generate_data import create_generate_basic_data
 from typing import Union
-import jax.numpy as jnp
+
+import generate_data
 
 def create_data_generator(kwargs):
-    generate_data = create_generate_basic_data(**kwargs)
+    _generate_data = generate_data.create_generate_basic_data(**kwargs)
     
     def data_generator(key: jnp.ndarray, n: int, batch_size: Union[int, None]=None):
         
         # Generate the full dataset in one go
-        data = generate_data(key, n)
+        data = _generate_data(key, n)
         
         noisy_approx = data[0]  # Noisy version of the approximation coefficient
         clean_signal = data[1]  # Noiseless version in the time domain
