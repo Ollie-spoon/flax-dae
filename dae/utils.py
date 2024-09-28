@@ -75,9 +75,9 @@ def plot_inverse_loss(metric_list, save_path):
 
     # Plot the inverse of each loss component
     for key in keys:
-        if key != "l2":
+        if key != "l2" and key != "kl" and key != "mse_wt":
             loss_values = jnp.array([metric[key] for metric in metric_list])
-            ax.plot(1/loss_values, label=key)
+            ax.plot(jnp.log(1/loss_values), label=key)
 
     # Set the x-axis label
     ax.set_xlabel('Time')
