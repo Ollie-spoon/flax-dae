@@ -267,7 +267,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch > config.num_epochs/15 and metrics['loss'] < best_loss:
+        if epoch > config.num_epochs/15 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
         # if metrics['loss'] < best_loss:
             
             # Create a validation data set 
@@ -278,10 +278,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             ))
             metrics = eval_f(state.params, test_batch, z_rng)
             
-            test_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
+            comparison_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
             
-            if test_loss < best_loss:
-                best_loss = test_loss
+            metrics["loss"] = comparison_loss
+            
+            if comparison_loss < best_loss:
+                best_loss = comparison_loss
                 loss.print_metrics(epoch, metrics, start_time, new_best=True)
                 utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
