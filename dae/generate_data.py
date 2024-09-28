@@ -87,7 +87,7 @@ def create_generate_basic_data(
             a=2.0,
             shape=(iterations,), 
             dtype=dtype,
-        ) / 5.0 + 0.80
+        ) / 20.0 + 0.95
         
         # Combine the amplitudes and amplitude sums
         amplitudes = amplitudes * amp_sum[:, None]
@@ -104,13 +104,13 @@ def create_generate_basic_data(
         param_array = param_array.at[:, ::2].set(amplitudes)
         param_array = param_array.at[:, 1::2].set(decay_constants)
         
-        jax.debug.print("param_array.shape: {}", param_array.shape)
+        # jax.debug.print("param_array.shape: {}", param_array.shape)
         
         SNR_array = (jax.random.normal(
             key=key_noise, 
             shape=(iterations,), 
             dtype=dtype,
-        ) / 10.0 + 1.0) * SNR
+        ) / 50.0 + 1.0) * SNR
         
         noise_power_array = amp_sum / SNR_array
         

@@ -230,36 +230,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         # print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
         
         metric_list.append(metrics)
-        
-        # # Lower the learning rate after 1000 epochs
-        # if epoch == 100:
-        #     state = train_state.TrainState(
-        #         step=state.step,  # Restore the step count from opt_state
-        #         apply_fn=state.apply_fn,
-        #         params=state.params,
-        #         tx=optax.adam(config.learning_rate/10),
-        #         opt_state=state.opt_state,  # Set the optimizer state
-        #     )
-        
-        # # Lower the learning rate after 1000 epochs
-        # if epoch == 2000:
-        #     state = train_state.TrainState(
-        #         step=state.step,  # Restore the step count from opt_state
-        #         apply_fn=state.apply_fn,
-        #         params=state.params,
-        #         tx=optax.adam(config.learning_rate/100),
-        #         opt_state=state.opt_state,  # Set the optimizer state
-        #     )
-        
-        # # Lower the learning rate after 1000 epochs
-        # if epoch == 7000:
-        #     state = train_state.TrainState(
-        #         step=state.step,  # Restore the step count from opt_state
-        #         apply_fn=state.apply_fn,
-        #         params=state.params,
-        #         tx=optax.adam(config.learning_rate/600),
-        #         opt_state=state.opt_state,  # Set the optimizer state
-        #     )
 
         # Print the evaluation metrics
         if (epoch + 1) % 10 == 0:
