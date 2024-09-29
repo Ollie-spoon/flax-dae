@@ -111,15 +111,14 @@ def create_generate_basic_data(
         
         # jax.debug.print("param_array.shape: {}", param_array.shape)
         
-        # SNR_array = (jax.random.normal(
-        #     key=key_noise, 
-        #     shape=(iterations,), 
-        #     dtype=dtype,
-        # ) / 50.0 + 1.0) * SNR
+        SNR_array = (jax.random.normal(
+            key=key_noise, 
+            shape=(iterations,), 
+            dtype=dtype,
+        ) / 10.0 + 0.975) * SNR
         
         # noise_power_array = amp_sum / SNR_array
-        
-        noise_power_array = jnp.ones(iterations, dtype=dtype) / SNR
+        noise_power_array = 1.0 / SNR_array
         
         keys = jax.random.split(key, iterations)
         

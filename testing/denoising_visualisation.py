@@ -34,9 +34,9 @@ def denoise_bi_exponential():
             "a1": 0.6, 
             "a2": 0.4, 
             "tau1_min": 10, 
-            "tau1_max": 300, 
+            "tau1_max": 180, 
             "tau2_min": 10, 
-            "tau2_max": 300,
+            "tau2_max": 180,
             "tau3_min": 10, 
             "tau3_max": 300,
         },
@@ -54,6 +54,7 @@ def denoise_bi_exponential():
                    maxval=1, 
                    shape=(3, ))
     a1, a2, a3 = amp / jnp.sum(amp)
+    a1, a2 = data_args["params"]["a1"], data_args["params"]["a2"]
     tau1 = random.uniform(key1, 
                    minval=data_args["params"]["tau1_min"], 
                    maxval=data_args["params"]["tau1_max"], 
@@ -66,8 +67,8 @@ def denoise_bi_exponential():
                    minval=data_args["params"]["tau3_min"], 
                    maxval=data_args["params"]["tau3_max"], 
                    shape=())
-    # tau1, tau2 = 20, 180
-    decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2) + a3 * jnp.exp(-t/tau3)
+    tau1, tau2 = 20, 180
+    decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)# + a3 * jnp.exp(-t/tau3)
     
     print(f"Amplitudes: {a1}, {a2}, {a3}")
     print(f"Decay constants: {tau1}, {tau2}, {tau3}")
@@ -86,7 +87,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\maybe_sun_17.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\sun_test_1.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:
