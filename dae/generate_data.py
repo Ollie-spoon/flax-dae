@@ -74,23 +74,28 @@ def create_generate_basic_data(
         # Generate random tau values for all iterations (inside JIT context)
         key, key_amp, key_ampsum, key_tau, key_noise = jax.random.split(key, 5)
         
-        amplitudes = jax.random.dirichlet(
-            key=key_amp,
-            alpha=jnp.ones(params["decay_count"]),
-            shape=(iterations,),
-            dtype=dtype,
-        )
+        # amplitudes = jax.random.dirichlet(
+        #     key=key_amp,
+        #     alpha=jnp.ones(params["decay_count"]),
+        #     shape=(iterations,),
+        #     dtype=dtype,
+        # )
         
-        # Generate random amplitude sums for each iteration
-        amp_sum = jax.random.gamma(
-            key=key_ampsum, 
-            a=2.0,
-            shape=(iterations,), 
-            dtype=dtype,
-        ) / 20.0 + 0.95
+        amplitudes = jnp.array([
+            jnp.ones(iterations)*0.4, 
+            jnp.ones(iterations)*0.6, 
+        ], dtype=dtype).T
         
-        # Combine the amplitudes and amplitude sums
-        amplitudes = amplitudes * amp_sum[:, None]
+        # # Generate random amplitude sums for each iteration
+        # amp_sum = jax.random.gamma(
+        #     key=key_ampsum, 
+        #     a=2.0,
+        #     shape=(iterations,), 
+        #     dtype=dtype,
+        # ) / 20.0 + 0.95
+        
+        # # Combine the amplitudes and amplitude sums
+        # amplitudes = amplitudes * amp_sum[:, None]
         
         decay_constants = jax.random.uniform(
             key=key_tau,
@@ -106,13 +111,15 @@ def create_generate_basic_data(
         
         # jax.debug.print("param_array.shape: {}", param_array.shape)
         
-        SNR_array = (jax.random.normal(
-            key=key_noise, 
-            shape=(iterations,), 
-            dtype=dtype,
-        ) / 50.0 + 1.0) * SNR
+        # SNR_array = (jax.random.normal(
+        #     key=key_noise, 
+        #     shape=(iterations,), 
+        #     dtype=dtype,
+        # ) / 50.0 + 1.0) * SNR
         
-        noise_power_array = amp_sum / SNR_array
+        # noise_power_array = amp_sum / SNR_array
+        
+        noise_power_array = jnp.ones(iterations, dtype=dtype) / SNR
         
         keys = jax.random.split(key, iterations)
         

@@ -114,8 +114,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             "a_min": 0,
             "a_max": 1,
             "tau_min": 10,
-            "tau_max": 300,
-            "decay_count": 3,
+            "tau_max": 180,
+            "decay_count": 2,
         },
         "t_max": 400, 
         "t_len": 1120, 
@@ -141,7 +141,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
         # Restore the train state
         state = train_state.TrainState(
-            step=100*10000,  # Restore the step count from opt_state
+            step=1000*10000,  # Restore the step count from opt_state
             apply_fn=models.model(**model_args).apply,
             params=params,
             tx=optax.adam(create_learning_rate_scheduler(config)),

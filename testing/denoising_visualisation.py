@@ -33,12 +33,12 @@ def denoise_bi_exponential():
         "params": {
             "a1": 0.6, 
             "a2": 0.4, 
-            "tau1_min": 20, 
-            "tau1_max": 120, 
-            "tau2_min": 80, 
-            "tau2_max": 180,
-            "tau3_min": 20, 
-            "tau3_max": 180,
+            "tau1_min": 10, 
+            "tau1_max": 300, 
+            "tau2_min": 10, 
+            "tau2_max": 300,
+            "tau3_min": 10, 
+            "tau3_max": 300,
         },
         "t_max": 400, 
         "t_len": 1120, 
@@ -86,7 +86,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\in_question_0_5258.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\maybe_sun_17.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:

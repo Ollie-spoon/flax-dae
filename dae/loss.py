@@ -157,8 +157,8 @@ def create_compute_metrics(wavelet, mode):
         normal_weights = {
             "wt": 22500,
             "t": 450000,
-            "fft_m": 6,
-            "fft_p": 3000000,
+            "fft_m": 60,
+            "fft_p": 100000,
             "fft_m_max": 0.00003,
             "fft_p_max": 0.02,
             "l2": 0.00002,
