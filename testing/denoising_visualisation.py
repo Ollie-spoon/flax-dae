@@ -87,7 +87,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\sun_test_1.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\sun_night_0_4_0_6.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:

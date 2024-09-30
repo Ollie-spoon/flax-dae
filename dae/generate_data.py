@@ -74,17 +74,17 @@ def create_generate_basic_data(
         # Generate random tau values for all iterations (inside JIT context)
         key, key_amp, key_ampsum, key_tau, key_noise = jax.random.split(key, 5)
         
-        # amplitudes = jax.random.dirichlet(
-        #     key=key_amp,
-        #     alpha=jnp.ones(params["decay_count"]),
-        #     shape=(iterations,),
-        #     dtype=dtype,
-        # )
+        amplitudes = jax.random.dirichlet(
+            key=key_amp,
+            alpha=jnp.ones(params["decay_count"]),
+            shape=(iterations,),
+            dtype=dtype,
+        )
         
-        amplitudes = jnp.array([
-            jnp.ones(iterations)*0.4, 
-            jnp.ones(iterations)*0.6, 
-        ], dtype=dtype).T
+        # amplitudes = jnp.array([
+        #     jnp.ones(iterations)*0.4, 
+        #     jnp.ones(iterations)*0.6, 
+        # ], dtype=dtype).T
         
         # # Generate random amplitude sums for each iteration
         # amp_sum = jax.random.gamma(

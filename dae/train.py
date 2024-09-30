@@ -232,11 +232,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         metric_list.append(metrics)
 
         # Print the evaluation metrics
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 2 == 0:
             loss.print_metrics(epoch, metrics, start_time)
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch > config.num_epochs/15 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if epoch > config.num_epochs/20 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
         # if metrics['loss'] < best_loss:
             
             # Create a validation data set 
