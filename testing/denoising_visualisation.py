@@ -16,6 +16,10 @@ import os
 sys.path.append(os.path.abspath('C:/Users/omnic/OneDrive/Documents/MIT/Programming/dae/flax/dae'))
 
 from models import model
+from train import create_eval_f
+from input_pipeline import create_data_generator
+from generate_data import create_multi_exponential_decay, create_wavelet_approx, create_wavelet_decomposition
+from loss import create_compute_metrics, print_metrics
 
 def denoise_bi_exponential():
     # Generate bi-exponential decay
@@ -26,7 +30,7 @@ def denoise_bi_exponential():
     # rng = 3496390746816
     print(f"rng: {rng}")
     rng = key(rng)
-    rng, key1, key2, key3, key4, key5, key6 = split(rng, 7)
+    rng, key1, key2, key3, key4, key5, key6, key7 = split(rng, 8)
     
     # Define the test data parameters
     data_args = {
@@ -39,6 +43,7 @@ def denoise_bi_exponential():
             "tau2_max": 180,
             "tau3_min": 10, 
             "tau3_max": 300,
+            "decay_count": 2,
         },
         "t_max": 400, 
         "t_len": 1120, 
@@ -48,13 +53,16 @@ def denoise_bi_exponential():
         "dtype": jnp.float32,
     }
     
+    
+    
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
     amp = random.uniform(key6, 
                    minval=0, 
                    maxval=1, 
                    shape=(3, ))
-    a1, a2, a3 = amp / jnp.sum(amp)
-    a1, a2 = data_args["params"]["a1"], data_args["params"]["a2"]
+    # a1, a2, a3 = amp / jnp.sum(amp)
+    a1, a2, a3 = amp / jnp.sum(amp[:-1])
+    # a1, a2 = data_args["params"]["a1"], data_args["params"]["a2"]
     tau1 = random.uniform(key1, 
                    minval=data_args["params"]["tau1_min"], 
                    maxval=data_args["params"]["tau1_max"], 
@@ -67,7 +75,7 @@ def denoise_bi_exponential():
                    minval=data_args["params"]["tau3_min"], 
                    maxval=data_args["params"]["tau3_max"], 
                    shape=())
-    tau1, tau2 = 20, 180
+    # tau1, tau2 = 20, 180
     decay = a1 * jnp.exp(-t/tau1) + a2 * jnp.exp(-t/tau2)# + a3 * jnp.exp(-t/tau3)
     
     print(f"Amplitudes: {a1}, {a2}, {a3}")
@@ -87,7 +95,7 @@ def denoise_bi_exponential():
     clean_approx = coeffs_clean[0]
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\sun_night_0_4_0_6.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\mon_9_speculative.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # Current favourites:
@@ -96,9 +104,61 @@ def denoise_bi_exponential():
     # permanent_saves\thurs_19_latent_30.pkl: Pretty good, but I'm not sure if it's the best.
     # permanent_saves\fft_m_max.pkl: 
 
+    ## ~~ Evaluation ~~ ##
+    
+    data_args = {
+        "params": {
+            "a_min": 0,
+            "a_max": 1,
+            "tau_min": 5,
+            "tau_max": 300,
+            "decay_count": 2,
+        },
+        "t_max": 400, 
+        "t_len": 1120, 
+        "SNR": 100,
+        "wavelet": "coif6", 
+        "mode": "zero",
+        "dtype": jnp.float32,
+        "max_dwt_level": 5,
+    }
+    
     # Pass approximation coefficients through neural network
+    get_metrics = create_compute_metrics(wavelet, mode)
+    eval_f = create_eval_f(checkpoint['model_args'], data_args)
+    data_generator = create_data_generator(data_args)
+    
+    # Create a test data set 
+    test_batch = next(data_generator(
+        key=key7, 
+        n=10000,
+    ))
+    
+    noisy_approx, clean_signal = test_batch
+    
+    # wavelet_decomposition = jax.vmap(create_wavelet_decomposition(wavelet, mode, 4))
+    # clean_decomposition = wavelet_decomposition(clean_signal)
+    
+    # diff = jax.vmap(lambda x, y: x - y[0])(noisy_approx, clean_decomposition)
+    
+    # print(f"mse(wt, noisy): {jnp.mean(jnp.square(noisy_approx - clean_approx))}")
+    
+    noisy_metrics = get_metrics(noisy_approx, noisy_approx, None, None, clean_signal, checkpoint['params'])
+
+    # Evaluate the model
+    rng, z_rng = random.split(rng)
+    metrics = eval_f(checkpoint['params'], test_batch, z_rng)
+    
+    print(f"Over 10000 samples, the original data had an average loss of:")
+    print_metrics(0, noisy_metrics, time())
+    print(f"Over 10000 samples, the denoised data had an average loss of:")
+    print_metrics(0, metrics, time())
+    
+    
+    ## ~~ Visualisation ~~ ##
+    
     noisy_approx = coeffs[0]
-    denoised_approx_coeffs, _, _ = eval_f(
+    denoised_approx_coeffs, _, _ = eval_f_(
         params=checkpoint['params'],
         noisy_data=noisy_approx,
         model_args=checkpoint['model_args'],
@@ -242,7 +302,7 @@ def get_mse_loss(recon_x, noiseless_x):
     return jnp.mean(jnp.square(recon_x - noiseless_x))
 
 # Define the evaluation function
-def eval_f(params, noisy_data, model_args, z_rng):
+def eval_f_(params, noisy_data, model_args, z_rng):
     
     def eval_model(vae):
         return vae(noisy_data, z_rng, deterministic=True)

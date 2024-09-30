@@ -84,13 +84,16 @@ def create_noise_injection(wavelet, mode):
     @jit
     def noise_injection(denoised_approx, noisy_approx, clean_signal):
         """ Inject noise into the clean signal via the approximation coefficients from the wavelet decomposition """
-        
+
         # forward wavelet transform
         clean_coeffs = wavedec(clean_signal, wavelet, mode)
+        
+        # jprint("clean_coeffs: ", jnp.array([c.shape for c in clean_coeffs]))
         
         # Noise injection
         clean_approx = clean_coeffs[0]
         clean_coeffs[0] = denoised_approx
+        
         
         # inverse wavelet transform
         injected_denoised = waverec(clean_coeffs, wavelet, mode)
@@ -136,6 +139,20 @@ def fft_mse_loss(clean_signal, prediction_signal, noisy_signal, mag_scale, phase
 def create_compute_metrics(wavelet, mode):
 
     noise_injection = create_noise_injection(wavelet, mode)
+    
+    normal_weights = {
+        "wt": 17300,
+        "t": 300000,
+        "fft_m": 10,
+        "fft_p": 150000,
+        "fft_m_max": 0.00003,
+        "fft_p_max": 0.02,
+        "l2": 0.00002,
+    }
+    
+    # for key, value in normal_weights.items():
+    #     if key != "l2":
+    #         normal_weights[key] = value/(1+1+0.1+0.01)
 
     @jit
     def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
@@ -154,15 +171,7 @@ def create_compute_metrics(wavelet, mode):
         # calculating losses    
         metrics = {}
         
-        normal_weights = {
-            "wt": 22500,
-            "t": 450000,
-            "fft_m": 8,
-            "fft_p": 100000,
-            "fft_m_max": 0.00003,
-            "fft_p_max": 0.02,
-            "l2": 0.00002,
-        }
+        
         
         metrics["mse_wt"] = get_mse_loss(recon_approx, clean_approx, scale=normal_weights["wt"]/1000).mean()
         metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]).mean()
@@ -171,7 +180,7 @@ def create_compute_metrics(wavelet, mode):
             injected_denoised, 
             injected_noisy,
             mag_scale=normal_weights["fft_m"],
-            phase_scale=normal_weights["fft_p"],
+            phase_scale=normal_weights["fft_p"]/10,
             mag_max_scale=normal_weights["fft_m_max"]/10,
             phase_max_scale=normal_weights["fft_p_max"]/10,
         )

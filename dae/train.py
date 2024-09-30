@@ -113,8 +113,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "params": {
             "a_min": 0,
             "a_max": 1,
-            "tau_min": 10,
-            "tau_max": 180,
+            "tau_min": 5,
+            "tau_max": 300,
             "decay_count": 2,
         },
         "t_max": 400, 
