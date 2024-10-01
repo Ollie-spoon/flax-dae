@@ -175,15 +175,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         """
         
         # Perform noise injection
-        print("clean_signal: ", clean_signal.shape)
-        print("noisy_approx: ", noisy_approx.shape)
-        print("recon_approx: ", recon_approx.shape)
         
         clean_approx, injected_noisy, injected_denoised  = noise_injection(clean_signal, noisy_approx, recon_approx)
-        
-        print("clean_approx: ", clean_approx.shape)
-        print("injected_noisy: ", injected_noisy.shape)
-        print("injected_denoised: ", injected_denoised.shape)
         
         # Initialize metrics dictionary
         metrics = {}
@@ -271,8 +264,8 @@ def print_metrics(metrics, pre_text=""):
     print_out = pre_text
     if 'loss' in metrics:
         print_out += f"loss: {metrics['loss']:.4f}, "
-    for key, value in metrics.items():
-        if value != 0 and key != "loss":
+    for key in metrics.keys():
+        if key != "loss":
             print_out += f"{key}: {metrics[key]:.4f}, "
     
     print(print_out)

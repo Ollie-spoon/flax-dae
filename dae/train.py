@@ -101,7 +101,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
-    rng = random.key(2024)
+    rng = random.key(2000)
     rng, init_rng, example_rng, z_rng, io_rng  = random.split(rng, 5)
     
     # Define the test data parameters
@@ -118,7 +118,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "SNR": 100,
         "wavelet": "coif6", 
         "mode": "zero",
-        "dtype": jnp.float32,
+        "dtype": jnp.float64,
     }
     
     # Generate extract the input/output dimensions and maximum number of 
@@ -149,13 +149,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         model_args = {
             "latents": config.latents,
             "hidden": config.hidden,
-            "dropout_rate": config.dropout_rate, 
+            "dropout_rate": data_args["dtype"](config.dropout_rate), 
             "io_dim": io_dim
         }
         
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
-        init_data = jnp.ones((config.batch_size, io_dim), data_args["dtype"])
+        init_data = jnp.ones((config.batch_size, io_dim), dtype=data_args["dtype"])
         params = models.model(**model_args).init(init_rng, init_data, z_rng)['params']
 
         # Initialize the training state including the optimizer
@@ -191,6 +191,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     )
     # Clear memory
     del example_batch, time_keeping, init_rng, example_rng, z_rng, io_rng
+    
+    # We want to verify that all of the data has the jnp.float64 type
+    print(f"Intended Data type: {data_args['dtype']}")
+    print(f"Model Data type: {state.params}")
     
     # Train the model
     # SNR_shift = 10.0
