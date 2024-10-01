@@ -115,7 +115,7 @@ def create_generate_basic_data(
             key=key_noise, 
             shape=(iterations,), 
             dtype=dtype,
-        ) / 10.0 + 0.975) * SNR
+        ) / 5.0 + 0.9) * SNR
         
         # noise_power_array = amp_sum / SNR_array
         noise_power_array = 1.0 / SNR_array
