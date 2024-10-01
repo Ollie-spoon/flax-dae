@@ -1,9 +1,9 @@
 """Training and evaluation logic."""
 
 from absl import logging
+from jax import random
 import jax
 jax.config.update("jax_enable_x64", True)
-from jax import random
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.training import train_state
@@ -101,7 +101,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
-    rng = random.key(2000)
+    rng = random.key(jnp.int64(2000))
     rng, init_rng, example_rng, z_rng, io_rng  = random.split(rng, 5)
     
     # Define the test data parameters
@@ -118,7 +118,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         "SNR": 100,
         "wavelet": "coif6", 
         "mode": "zero",
-        "dtype": jnp.float64,
+        "dtype": jnp.float32,
     }
     
     # Generate extract the input/output dimensions and maximum number of 
@@ -149,14 +149,27 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         model_args = {
             "latents": config.latents,
             "hidden": config.hidden,
-            "dropout_rate": data_args["dtype"](config.dropout_rate), 
-            "io_dim": io_dim
+            "dropout_rate": config.dropout_rate, 
+            "io_dim": io_dim,
+            "dtype": data_args["dtype"],
         }
         
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
         init_data = jnp.ones((config.batch_size, io_dim), dtype=data_args["dtype"])
+        
+        # print("###############################################")
+        # print(f"Model Data type: {data_args['dtype']}")
+        # print(f"init_data Data type: {init_data.dtype}")
+        # print(f"init_rng Data type: {init_rng.dtype}")
+        # print(f"z_rng Data type: {z_rng.dtype}")
+        # print(f"model_args: {model_args}")
+        
         params = models.model(**model_args).init(init_rng, init_data, z_rng)['params']
+        
+        # print(f"params['encoder']['hidden_layer_1']['kernel']: {params['encoder']['hidden_layer_1']['kernel'].dtype}")
+        
+        # params = jax.tree_map(lambda x: x.astype(jnp.float64), params)
 
         # Initialize the training state including the optimizer
         state = train_state.TrainState.create(
@@ -164,6 +177,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             params=params,
             tx=optax.adam(create_learning_rate_scheduler(config)),
         )
+        # print(f"params['encoder']['hidden_layer_1']['kernel']: {params['encoder']['hidden_layer_1']['kernel'].dtype}")
         
     # Create the data generator
     data_generator = input_pipeline.create_data_generator(data_args)
@@ -193,12 +207,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     del example_batch, time_keeping, init_rng, example_rng, z_rng, io_rng
     
     # We want to verify that all of the data has the jnp.float64 type
-    print(f"Intended Data type: {data_args['dtype']}")
-    print(f"Model Data type: {state.params}")
+    # print(f"Intended Data type: {data_args['dtype']}")
     
     # Train the model
     # SNR_shift = 10.0
     for epoch in range(config.num_epochs):
+        # print(f"Model Data type: {state.params['encoder']['hidden_layer_1']}")
         # SNR_shift *= 1.1
         # if SNR_shift > 100:
         #     SNR_shift = 100
