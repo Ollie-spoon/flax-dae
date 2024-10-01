@@ -39,7 +39,7 @@ def create_generate_single_data(t, wavelet, mode, max_dwt_level):
         # Perform wavelet decomposition
         noisy_coeffs = wavelet_approx(noisy_signal)
 
-        return noisy_coeffs, clean_signal
+        return clean_signal, noisy_coeffs
     
     return generate_single_data
 

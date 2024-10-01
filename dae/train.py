@@ -40,13 +40,12 @@ def create_learning_rate_scheduler(config):
     return learning_rate_schedule
 
 # Define the training step
-def create_train_step(model_args, data_args):
-    
-    get_metrics = loss.create_compute_metrics(data_args["wavelet"], data_args["mode"])
+def create_train_step(get_metrics, model_args):
 
     @jax.jit
-    def train_step(state, batch, z_rng, dropout_rng):
-        noisy_approx, clean_signal = batch
+    def train_step(state, batch, rng):
+        clean_signal, noisy_approx = batch
+        z_rng, dropout_rng = random.split(rng)
         
         def loss_fn(params):
             prediction, mean, logvar = models.model(
@@ -62,8 +61,7 @@ def create_train_step(model_args, data_args):
                 rngs={'dropout': dropout_rng},
             )
 
-            # loss = compute_metrics(difference_prediction, noiseless_data, noisy_approx, state.params)['loss']
-            loss = get_metrics(prediction, noisy_approx, mean, logvar, clean_signal, params)["loss"]
+            loss = get_metrics(clean_signal, noisy_approx, prediction, mean, logvar, params)["loss"]
             return loss
 
         grads = jax.grad(loss_fn)(state.params)
@@ -72,13 +70,11 @@ def create_train_step(model_args, data_args):
 
 
 # Define the evaluation function
-def create_eval_f(model_args, data_args):
-    
-    get_metrics = loss.create_compute_metrics(data_args["wavelet"], data_args["mode"])
+def create_eval_f(get_metrics, model_args):
     
     @jax.jit
     def eval_f(params, batch, z_rng):
-        noisy_approx, clean_signal = batch
+        clean_signal, noisy_approx = batch
         
         def eval_model(vae):
             z_rng, 
@@ -87,8 +83,8 @@ def create_eval_f(model_args, data_args):
             # This could be reintroduced at some point
             # comparison = jnp.array([noiseless_data[:3], noisy_data[:3] + difference_prediction[:3]])
             
-            # metrics = compute_metrics(difference_prediction, noiseless_data, noisy_data, params)
-            metrics = get_metrics(prediction, noisy_approx, mean, logvar, clean_signal, params)
+            # metrics = get_metrics(difference_prediction, noiseless_data, noisy_data, params)
+            metrics = get_metrics(clean_signal, noisy_approx, prediction, mean, logvar, params)
             return metrics#, comparison
 
         return nn.apply(eval_model, models.model(
@@ -106,7 +102,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
     rng = random.key(2024)
-    rng, init_rng, z_rng, io_rng = random.split(rng, 4)
+    rng, init_rng, example_rng, z_rng, io_rng  = random.split(rng, 5)
     
     # Define the test data parameters
     data_args = {
@@ -170,9 +166,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         )
         
     # Create the data generator
-    train_step = create_train_step(model_args, data_args)
-    eval_f = create_eval_f(model_args, data_args)
     data_generator = input_pipeline.create_data_generator(data_args)
+    
+    # Use the data generateor to create an example batch so that losses can be meaningfully 
+    # normalized to the noisy data
+    example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
+    get_metrics = loss.create_compute_metrics(config.loss_scaling, example_batch, data_args["wavelet"], data_args["mode"])
+    # example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
+    # metrics = get_metrics(example_batch[0], example_batch[1], example_batch[1], None, None, state.params)
+    # loss.print_metrics(metrics, "Example batch metrics: ")
+    
+    # Create the training step and evaluation function
+    train_step = create_train_step(get_metrics, model_args)
+    eval_f = create_eval_f(get_metrics, model_args)
 
     metric_list = []
     best_loss = jnp.inf
@@ -183,7 +189,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         f"configs: {config}\n"
         f"data_args: {data_args}\n"
     )
-    del time_keeping, init_rng, io_rng
+    # Clear memory
+    del example_batch, time_keeping, init_rng, example_rng, z_rng, io_rng
     
     # Train the model
     # SNR_shift = 10.0
@@ -216,15 +223,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         # Train the model for one epoch
         for batch in train_ds:
-            rng, z_rng, dropout_rng = random.split(rng, 3)
-            state = train_step(state, batch, z_rng, dropout_rng)
+            rng, train_rng = random.split(rng)
+            state = train_step(state, batch, train_rng)
         
         # print(f"time taken to train: {time()-time_keeping:.3f}s")
         # time_keeping = time()
 
         # Evaluate the model
-        rng, z_rng = random.split(rng)
-        metrics = eval_f(state.params, test_batch, z_rng)
+        rng, eval_rng = random.split(rng)
+        metrics = eval_f(state.params, test_batch, eval_rng)
         # metrics, comparison = eval_f(state.params, test_batch, model_args)
         
         # print(f"time taken to evaluate: {time()-time_keeping:.3f}s")
@@ -233,7 +240,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
 
         # Print the evaluation metrics
         if (epoch + 1) % 2 == 0:
-            loss.print_metrics(epoch, metrics, start_time)
+            loss.print_metrics(metrics, f"epoch: {epoch + 1}, time {time()-start_time:.2f}s, ")
         
         # Save the best model, assuming that it performs equally well on the validation set
         if epoch > config.num_epochs/20 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
@@ -253,7 +260,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             
             if comparison_loss < best_loss:
                 best_loss = comparison_loss
-                loss.print_metrics(epoch, metrics, start_time, new_best=True)
+                loss.print_metrics(metrics, f"New best loss at epoch: {epoch + 1}, ")
                 utils.save_model(state, 0, working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
         # Save the model

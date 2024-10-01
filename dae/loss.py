@@ -5,24 +5,26 @@ import jax.numpy as jnp
 from jax.scipy.special import erfc
 from cr.wavelets import wavedec, waverec
 from time import time
+from typing import Dict, List
 
-# Define the loss functions
+#### ~~~~ Define the loss functions ~~~~ ####
 
 # Mean Squared Error Loss
+@vmap
 @jit
-def get_mse_loss(recon_x, noiseless_x, scale=159419):
-    return jnp.mean(jnp.square(recon_x - noiseless_x)) * scale
+def get_mse_loss(noiseless_x, recon_x):
+    return jnp.mean(jnp.square(recon_x - noiseless_x))
 
 # Mean Absolute Error Loss
 @vmap
 @jit
-def get_mae_loss(recon_x, noiseless_x):
+def get_mae_loss(noiseless_x, recon_x):
     return jnp.mean(jnp.abs(recon_x - noiseless_x))
 
 # Huber Loss
 @vmap
 @jit
-def huber_loss(recon_x, noiseless_x, delta=1.0):
+def huber_loss(noiseless_x, recon_x, delta=1.0):
     diff = recon_x - noiseless_x
     abs_diff = jnp.abs(diff)
     quadratic = jnp.minimum(abs_diff, delta)
@@ -31,7 +33,7 @@ def huber_loss(recon_x, noiseless_x, delta=1.0):
 
 @vmap
 @jit
-def get_huber_loss(recon_x, noiseless_x, delta=1.0):
+def get_huber_loss(noiseless_x, recon_x, delta=1.0):
     return jnp.mean(huber_loss(recon_x, noiseless_x, delta))
 
 # Logarithmic Loss
@@ -46,14 +48,14 @@ def abs_complex_log10(numbers):
 
 @vmap
 @jit
-def get_log_mse_loss(recon_x, noiseless_x, eps=1e-16):
+def get_log_mse_loss(noiseless_x, recon_x, eps=1e-16):
     return jnp.square(abs_complex_log10(recon_x+eps) - abs_complex_log10(noiseless_x+eps)).mean()
 
 # Maximum Loss
 @vmap
 @jit
-def get_max_loss(recon_x, noiseless_x, scale=72.51828996):
-    return jnp.max(jnp.abs(recon_x - noiseless_x))*scale
+def get_max_loss(noiseless_x, recon_x):
+    return jnp.max(jnp.abs(recon_x - noiseless_x))
 
 # L2 Regularization Loss
 @jit
@@ -82,7 +84,7 @@ def create_noise_injection(wavelet, mode):
     # Noise injection function
     @vmap
     @jit
-    def noise_injection(denoised_approx, noisy_approx, clean_signal):
+    def noise_injection(clean_signal, noisy_approx, denoised_approx):
         """ Inject noise into the clean signal via the approximation coefficients from the wavelet decomposition """
 
         # forward wavelet transform
@@ -102,12 +104,13 @@ def create_noise_injection(wavelet, mode):
         
         injected_noisy = waverec(clean_coeffs, wavelet, mode)
         
-        return injected_denoised, injected_noisy, clean_approx
+        return clean_approx, injected_noisy, injected_denoised
     return noise_injection
 
 # FFT MSE Loss
+@vmap
 @jit
-def fft_mse_loss(clean_signal, prediction_signal, noisy_signal, mag_scale, phase_scale, mag_max_scale, phase_max_scale):
+def fft_losses(clean_signal, noisy_signal, prediction_signal):
     clean_fft = jnp.fft.fft(clean_signal)
     pred_fft = jnp.fft.fft(prediction_signal)
     noisy_fft = jnp.fft.fft(noisy_signal)
@@ -124,8 +127,8 @@ def fft_mse_loss(clean_signal, prediction_signal, noisy_signal, mag_scale, phase
     mag_mean = jnp.sqrt(
         jnp.mean(jnp.square(clean_mag - pred_mag)) +
         jnp.mean(jnp.abs(clean_mag - pred_mag))
-        )*mag_scale
-    phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))*phase_scale
+        )
+    phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))
     
     mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
     phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
@@ -135,12 +138,86 @@ def fft_mse_loss(clean_signal, prediction_signal, noisy_signal, mag_scale, phase
     
     return mag_mean, phase_mean, mag_max, phase_max
 
-# Combine the loss functions into a single value
-def create_compute_metrics(wavelet, mode):
+#### ~~~~ Define the loss functions dict ~~~~ ####
 
-    noise_injection = create_noise_injection(wavelet, mode)
+SCALE_AGNOSTIC_LOSSES = ["l2", "kl"]
+
+def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavelet, mode):
+    """
+    Creates a compute metrics function with scaled loss weights.
     
-    normal_weights = {
+    Args:
+    - loss_scaling (Dict[str, float]): Dictionary of loss scaling factors.
+    - loss_types (Dict[str, str]): Dictionary of loss types (e.g., "mse", "l2", etc.).
+    - example_batch: Example batch of data.
+    - wavelet: Wavelet object.
+    - mode: Mode string.
+    
+    Returns:
+    - compute_metrics (Callable): Compute metrics function with scaled loss weights.
+    """
+    
+    # Define compute metrics function with scaled loss weights
+    def compute_metrics(clean_signal, noisy_approx, recon_approx, mean, logvar, model_params):
+        """
+        Computes metrics with scaled loss weights.
+        
+        Args:
+        - recon_approx: Reconstructed approximation.
+        - noisy_approx: Noisy approximation.
+        - mean: Mean value.
+        - logvar: Log variance value.
+        - clean_signal: Clean signal.
+        - model_params: Model parameters.
+        
+        Returns:
+        - metrics (Dict[str, float]): Dictionary of metrics.
+        """
+        
+        # Perform noise injection
+        print("clean_signal: ", clean_signal.shape)
+        print("noisy_approx: ", noisy_approx.shape)
+        print("recon_approx: ", recon_approx.shape)
+        
+        clean_approx, injected_noisy, injected_denoised  = noise_injection(clean_signal, noisy_approx, recon_approx)
+        
+        print("clean_approx: ", clean_approx.shape)
+        print("injected_noisy: ", injected_noisy.shape)
+        print("injected_denoised: ", injected_denoised.shape)
+        
+        # Initialize metrics dictionary
+        metrics = {}
+        
+        # Compute losses
+        if "wt" in loss_scaling:
+            metrics["wt"] = get_mse_loss(clean_approx, recon_approx).mean()
+        if "t" in loss_scaling:
+            metrics["t"] = get_mse_loss(clean_signal, injected_denoised).mean()
+        if "fft_m" in loss_scaling or "fft_p" in loss_scaling or "fft_m_max" in loss_scaling or "fft_p_max" in loss_scaling:
+            fft_losses_values = fft_losses(clean_signal, injected_noisy, injected_denoised)
+            if "fft_m" in loss_scaling:
+                metrics["fft_m"] = fft_losses_values[0].mean()
+            if "fft_p" in loss_scaling:
+                metrics["fft_p"] = fft_losses_values[1].mean()
+            if "fft_m_max" in loss_scaling:
+                metrics["fft_m_max"] = fft_losses_values[2].mean()
+            if "fft_p_max" in loss_scaling:
+                metrics["fft_p_max"] = fft_losses_values[3].mean()
+        if "kl" in loss_scaling:
+            metrics["kl"] = get_kl_divergence_lognorm(mean, logvar)
+        if "l2" in loss_scaling:
+            metrics["l2"] = get_l2_loss(model_params)
+        
+        for key in loss_scaling.keys():
+            metrics[key] *= scaled_weights[key]
+        
+        # Compute total loss
+        metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
+        
+        return metrics
+    
+    # Define baseline weights to get losses on the same order of magnitude
+    scaled_weights = {
         "wt": 17300,
         "t": 300000,
         "fft_m": 10,
@@ -148,80 +225,56 @@ def create_compute_metrics(wavelet, mode):
         "fft_m_max": 0.00003,
         "fft_p_max": 0.02,
         "l2": 0.00002,
+        "kl": 0.0001,
     }
     
-    # for key, value in normal_weights.items():
-    #     if key != "l2":
-    #         normal_weights[key] = value/(1+1+0.1+0.01)
+    # Extract data from example batch
+    clean_signal, noisy_approx = example_batch
+    
+    # Compute example metrics using baseline weights
+    noise_injection = create_noise_injection(wavelet, mode)
+    
+    
+    with loss_scaling.unlocked():
+        for key, value in loss_scaling.items():
+            if value == 0:
+                del scaled_weights[key]
+                del loss_scaling[key]
+        loss_scaling_placeholder = loss_scaling
+        for key in [value for value in SCALE_AGNOSTIC_LOSSES if value in loss_scaling.keys()]:
+            del loss_scaling[key]
+        # Print scaled weights
+        print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
+        
+        # Compute example metrics for each loss type
+        example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
+        
+        loss_scaling.update(loss_scaling_placeholder)
+        del loss_scaling_placeholder
+       
+    
+    # Update weights to be scaled
+    for key, value in example_metrics.items():
+        if key == "loss":
+            continue
+        
+        if key in loss_scaling and key not in SCALE_AGNOSTIC_LOSSES:
+            scaled_weights[key] *= loss_scaling[key] / value
+        else:
+            scaled_weights[key] *= loss_scaling[key]
+    
+    # JIT compile compute metrics function
+    return jit(compute_metrics)
 
-    @jit
-    def compute_metrics(recon_approx, noisy_approx, mean, logvar, clean_signal, model_params):
-
-        # Noise injection/preprocessing
-        injected_denoised, injected_noisy, clean_approx = noise_injection(recon_approx, noisy_approx, clean_signal)
-        
-        # jprint(f"recon_approx: {recon_approx.shape}")
-        # jprint(f"noisy_approx: {noisy_approx.shape}")
-        # jprint(f"mean: {mean.shape}")
-        # jprint(f"logvar: {logvar.shape}")
-        # jprint(f"clean_signal: {clean_signal.shape}")
-        # jprint(f"model_params: {model_params}")
-        # jprint(f"injected_denoised: {injected_denoised.shape}")
-        
-        # calculating losses    
-        metrics = {}
-        
-        
-        
-        metrics["mse_wt"] = get_mse_loss(recon_approx, clean_approx, scale=normal_weights["wt"]/1000).mean()
-        metrics["mse_t"] = get_mse_loss(injected_denoised, clean_signal, scale=normal_weights["t"]).mean()
-        mag, phase, mag_max, phase_max = fft_mse_loss(
-            clean_signal, 
-            injected_denoised, 
-            injected_noisy,
-            mag_scale=normal_weights["fft_m"],
-            phase_scale=normal_weights["fft_p"]/10,
-            mag_max_scale=normal_weights["fft_m_max"]/10,
-            phase_max_scale=normal_weights["fft_p_max"]/10,
-        )
-        metrics["mse_fft_m"] = mag.mean()
-        metrics["mse_fft_p"] = phase.mean()
-        # metrics["mse_fft_m_max"] = mag_max.mean()
-        # metrics["mse_fft_p_max"] = phase_max.mean()
-        # metrics["var_fft_m_max"] = mag_max.std()*10000000
-        # metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
-        # metrics["kl"] = get_kl_divergence_truncated_normal(mean, logvar).mean()
-        
-        # metrics["max"] = get_max_loss(injected_denoised, clean_signal).mean()
-        
-        metrics["l2"] = get_l2_loss(model_params)/2
-        
-        # for key, value in metrics.items():
-        #     jprint(f"key: {key}")
-        #     jprint("value: {}", value)
-        
-        metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
-        
-        return metrics
-    return compute_metrics
-
-def print_metrics(epoch, metrics, start_time, new_best=False):
-    print(
-        f"New best loss at epoch {epoch + 1}, " if new_best else f"epoch: {epoch + 1}, ",
-        f"time {time()-start_time:.2f}s, "
-        f"loss: {metrics['loss']:.4f}, "
-        f"mse_wt: {metrics['mse_wt']:.4f}, "
-        f"mse_t: {metrics['mse_t']:.4f}, "
-        f"mse_fft_m: {metrics['mse_fft_m']:.4f}, "
-        f"mse_fft_p: {metrics['mse_fft_p']:.4f}, "
-        # f"mse_fft_m_max: {metrics['mse_fft_m_max']:.4f}, "
-        # f"mse_fft_p_max: {metrics['mse_fft_p_max']:.4f}, "
-        # f"var_fft_m_max: {metrics['var_fft_m_max']:.8f}, "
-        # f"kl: {metrics['kl']:.8f}, "
-        # f"mae: {metrics['mae']:.8f}, "
-        # f"max: {metrics['max']:.5f}, "
-        # f"huber: {metrics['huber']:.8f}, "
-        # f"log_mse: {metrics['log_mse']:.8f}, "
-        f"l2: {metrics['l2']:.8f}"
-            )
+def print_metrics(metrics, pre_text=""):
+    
+    print_out = pre_text
+    if 'loss' in metrics:
+        print_out += f"loss: {metrics['loss']:.4f}, "
+    for key, value in metrics.items():
+        if value != 0 and key != "loss":
+            print_out += f"{key}: {metrics[key]:.4f}, "
+    
+    print(print_out)
+    return
     
