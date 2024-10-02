@@ -11,8 +11,8 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [150, 0.0002], 
-        [10000, 0.00002],
+        [150, 0.00025], 
+        [5000, 0.00008],
         [20000, 0.000002],
         # [1000, 0.0005*scale],
         # [2000, 0.0001*scale], 
@@ -36,7 +36,7 @@ def get_config():
     config.io_dim = 68
     config.batch_size = 2500
     config.epoch_size = 20000
-    config.num_epochs = 20000
+    config.num_epochs = 5000
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
     return config
