@@ -25,8 +25,8 @@ def get_config():
         "fft_p": 0.1,
         "fft_m_max": 0.0,
         "fft_p_max": 0.0,
-        "l2": 1.0,
-        "kl": 0.001,
+        "l2": 0.01,
+        "kl": 0.01,
     }
     config.latents = 35
     config.hidden = 150

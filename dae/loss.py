@@ -59,9 +59,9 @@ def get_max_loss(noiseless_x, recon_x):
 
 # L2 Regularization Loss
 @jit
-def get_l2_loss(params, alpha=0.001):
+def get_l2_loss(params):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
-    return alpha * sum(tree_util.tree_leaves(l2_loss))
+    return sum(tree_util.tree_leaves(l2_loss))
 
 # KL Divergence Loss
 
@@ -217,8 +217,10 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         "fft_p": 150000,
         "fft_m_max": 0.00003,
         "fft_p_max": 0.02,
-        "l2": 0.0002,
-        "kl": 0.000006,
+        "l2": 0.003,
+        "kl": 0.000005,
+        # "l2": 0.00002,
+        # "kl": 0.000006,
     }
     
     # Extract data from example batch
@@ -233,7 +235,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
             if value == 0:
                 del scaled_weights[key]
                 del loss_scaling[key]
-        scale_agnostic_scaling = {key: value for key, value in scaled_weights.items() if key in SCALE_AGNOSTIC_LOSSES}
+        scale_agnostic_scaling = {key: value for key, value in loss_scaling.items() if key in SCALE_AGNOSTIC_LOSSES}
         for key in scale_agnostic_scaling:
             del loss_scaling[key]
         # Print scaled weights
@@ -243,18 +245,20 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
         
         loss_scaling.update(scale_agnostic_scaling)
-        del scale_agnostic_scaling
        
     
     # Update weights to be scaled
-    for key, value in example_metrics.items():
+    print(f"loss_scaling: {loss_scaling}")
+    for key in loss_scaling.keys():
         if key == "loss":
             continue
         
-        if key in loss_scaling and key not in SCALE_AGNOSTIC_LOSSES:
-            scaled_weights[key] *= loss_scaling[key] / value
-        else:
+        if key in scaled_weights:
             scaled_weights[key] *= loss_scaling[key]
+            if key not in SCALE_AGNOSTIC_LOSSES:
+                scaled_weights[key] /= example_metrics[key]
+        else:
+            raise ValueError(f"Loss type '{key}' not found in scaled weights dictionary.")
     
     # JIT compile compute metrics function
     return jit(compute_metrics)
