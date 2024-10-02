@@ -11,12 +11,14 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [500, 0.001], 
-        [1000, 0.0005*scale],
-        [2000, 0.0001*scale], 
-        [6000, 0.00008*scale], 
-        [10000, 0.00004*scale], 
-        [20000, 0.00002*scale],
+        [50, 0.0002], 
+        [10000, 0.00002],
+        [20000, 0.000002],
+        # [1000, 0.0005*scale],
+        # [2000, 0.0001*scale], 
+        # [6000, 0.00008*scale], 
+        # [10000, 0.00004*scale], 
+        # [20000, 0.00002*scale],
     ])
     config.loss_scaling = {
         "wt": 0.01,
