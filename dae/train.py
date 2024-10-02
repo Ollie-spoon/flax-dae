@@ -259,7 +259,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 key=test_rng, 
                 n=config.batch_size*5
             ))
-            metrics = eval_f(state.params, test_batch, z_rng)
+            metrics = eval_f(state, test_batch, eval_rng)
             
             comparison_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
             
