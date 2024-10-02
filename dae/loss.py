@@ -59,7 +59,7 @@ def get_max_loss(noiseless_x, recon_x):
 
 # L2 Regularization Loss
 @jit
-def get_l2_loss(params, alpha=0.00001):
+def get_l2_loss(params, alpha=0.001):
     l2_loss = tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), params)
     return alpha * sum(tree_util.tree_leaves(l2_loss))
 
@@ -217,8 +217,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         "fft_p": 150000,
         "fft_m_max": 0.00003,
         "fft_p_max": 0.02,
-        "l2": 0.00002,
-        "kl": 0.0001,
+        "l2": 0.0002,
+        "kl": 0.000006,
     }
     
     # Extract data from example batch
@@ -233,8 +233,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
             if value == 0:
                 del scaled_weights[key]
                 del loss_scaling[key]
-        loss_scaling_placeholder = loss_scaling
-        for key in [value for value in SCALE_AGNOSTIC_LOSSES if value in loss_scaling.keys()]:
+        scale_agnostic_scaling = {key: value for key, value in scaled_weights.items() if key in SCALE_AGNOSTIC_LOSSES}
+        for key in scale_agnostic_scaling:
             del loss_scaling[key]
         # Print scaled weights
         print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
@@ -242,8 +242,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         # Compute example metrics for each loss type
         example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
         
-        loss_scaling.update(loss_scaling_placeholder)
-        del loss_scaling_placeholder
+        loss_scaling.update(scale_agnostic_scaling)
+        del scale_agnostic_scaling
        
     
     # Update weights to be scaled
