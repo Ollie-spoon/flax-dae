@@ -11,9 +11,9 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [15, 0.0001], 
-        [5000, 0.00002],
-        [20000, 0.000004],
+        [15, 0.0005], 
+        [5000, 0.0001],
+        [20000, 0.00004],
         # [1000, 0.0005*scale],
         # [2000, 0.0001*scale], 
         # [6000, 0.00008*scale], 
