@@ -25,8 +25,8 @@ def get_config():
         "t": 1.0,
         "fft_m": 1.0,
         "fft_p": 0.1,
-        "fft_m_max": 0.0,
-        "fft_p_max": 0.0,
+        "fft_m_max": 0.001,
+        "fft_p_max": 0.01,
         "l2": 0.1,
         "kl": 0.1,
     }
