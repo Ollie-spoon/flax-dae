@@ -50,6 +50,12 @@ class Encoder(nn.Module):
         # Residual block 1 (io_dim -> io_dim)
         x = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(x, deterministic=deterministic)
         
+        # Residual block 1 (io_dim -> io_dim)
+        x = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(x, deterministic=deterministic)
+        
+        # Residual block 1 (io_dim -> io_dim)
+        x = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(x, deterministic=deterministic)
+        
         # Hidden layer 1  (io_dim -> hidden)
         x = nn.Dense(features=self.hidden)(x)
         x = nn.BatchNorm(use_running_average=deterministic)(x)
@@ -79,6 +85,12 @@ class Decoder(nn.Module):
         z = nn.BatchNorm(use_running_average=deterministic)(z)
         z = nn.gelu(z)
         z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=deterministic)
+        
+        # Residual block 1 (io_dim -> io_dim)
+        z = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(z, deterministic=deterministic)
+        
+        # Residual block 1 (io_dim -> io_dim)
+        z = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(z, deterministic=deterministic)
         
         # Residual block 1 (io_dim -> io_dim)
         z = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(z, deterministic=deterministic)
