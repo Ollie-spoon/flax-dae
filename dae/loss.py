@@ -230,35 +230,35 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     noise_injection = create_noise_injection(wavelet, mode)
     
     
-    # with loss_scaling.unlocked():
-    #     for key, value in loss_scaling.items():
-    #         if value == 0:
-    #             del scaled_weights[key]
-    #             del loss_scaling[key]
-    #     scale_agnostic_scaling = {key: value for key, value in loss_scaling.items() if key in SCALE_AGNOSTIC_LOSSES}
-    #     for key in scale_agnostic_scaling:
-    #         del loss_scaling[key]
-    #     # Print scaled weights
-    #     print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
+    with loss_scaling.unlocked():
+        for key, value in loss_scaling.items():
+            if value == 0:
+                del scaled_weights[key]
+                del loss_scaling[key]
+        scale_agnostic_scaling = {key: value for key, value in loss_scaling.items() if key in SCALE_AGNOSTIC_LOSSES}
+        for key in scale_agnostic_scaling:
+            del loss_scaling[key]
+        # Print scaled weights
+        print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
         
-    #     # Compute example metrics for each loss type
-    #     example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
+        # Compute example metrics for each loss type
+        example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
         
-    #     loss_scaling.update(scale_agnostic_scaling)
+        loss_scaling.update(scale_agnostic_scaling)
        
     
-    # # Update weights to be scaled
-    # print(f"loss_scaling: {loss_scaling}")
-    # for key in loss_scaling.keys():
-    #     if key == "loss":
-    #         continue
+    # Update weights to be scaled
+    print(f"loss_scaling: {loss_scaling}")
+    for key in loss_scaling.keys():
+        if key == "loss":
+            continue
         
-    #     if key in scaled_weights:
-    #         scaled_weights[key] *= loss_scaling[key]
-    #         if key not in SCALE_AGNOSTIC_LOSSES:
-    #             scaled_weights[key] /= example_metrics[key]
-    #     else:
-    #         raise ValueError(f"Loss type '{key}' not found in scaled weights dictionary.")
+        if key in scaled_weights:
+            scaled_weights[key] *= loss_scaling[key]
+            if key not in SCALE_AGNOSTIC_LOSSES:
+                scaled_weights[key] /= example_metrics[key]
+        else:
+            raise ValueError(f"Loss type '{key}' not found in scaled weights dictionary.")
     
     # JIT compile compute metrics function
     return jit(compute_metrics)
