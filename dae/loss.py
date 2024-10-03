@@ -68,7 +68,7 @@ def get_l2_loss(params):
 # KL Divergence Loss for Log-Normal Distribution
 @jit
 def get_kl_divergence_lognorm(mean, logvar):
-  return -0.5 * jnp.mean(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
+  return -0.5 * jnp.sum(1 + logvar - jnp.square(mean) - jnp.exp(logvar))
 
 # KL Divergence Loss for Truncated Normal Distribution
 @jit
@@ -197,7 +197,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
             if "fft_p_max" in loss_scaling:
                 metrics["fft_p_max"] = fft_losses_values[3].mean()
         if "kl" in loss_scaling:
-            metrics["kl"] = get_kl_divergence_lognorm(mean, logvar)
+            metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         if "l2" in loss_scaling:
             metrics["l2"] = get_l2_loss(model_params)
         
@@ -218,7 +218,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         "fft_m_max": 0.00003,
         "fft_p_max": 0.02,
         "l2": 0.003,
-        "kl": 0.003,
+        "kl": 0.000005,
         # "l2": 0.00002,
         # "kl": 0.000006,
     }
