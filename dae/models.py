@@ -47,8 +47,8 @@ class Encoder(nn.Module):
     @nn.compact
     def __call__(self, x, deterministic: bool):
         
-        # Residual block 1 (io_dim -> io_dim)
-        x = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(x, deterministic=deterministic)
+        # # Residual block 1 (io_dim -> io_dim)
+        # x = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(x, deterministic=deterministic)
         
         # Hidden layer 1  (io_dim -> hidden)
         x = nn.Dense(features=self.hidden)(x)
@@ -80,11 +80,11 @@ class Decoder(nn.Module):
         z = nn.gelu(z)
         z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=deterministic)
         
-        # Residual block 1 (io_dim -> io_dim)
-        z = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(z, deterministic=deterministic)
+        # # Residual block 1 (io_dim -> io_dim)
+        # z = ResidualBlock(self.io_dim, self.hidden, self.dropout_rate)(z, deterministic=deterministic)
 
-        # # Output layer  (io_dim -> io_dim)
-        # z = nn.Dense(features=self.io_dim)(z)
+        # Output layer  (io_dim -> io_dim)
+        z = nn.Dense(features=self.io_dim)(z)
         return z
 
 
