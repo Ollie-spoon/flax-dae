@@ -3,7 +3,7 @@
 from absl import logging
 from jax import random
 import jax
-jax.config.update("jax_enable_x64", True)
+# jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from flax.training.train_state import TrainState
 import ml_collections
@@ -14,11 +14,13 @@ import optax
 import models
 import utils
 import input_pipeline
+import data_processing
 import loss
 
 
 class CustomTrainState(TrainState):
-    batch_stats: Any
+    # batch_stats: Any
+    pass
 
 def create_learning_rate_scheduler(config):
     batches_per_epoch = config.epoch_size / config.batch_size
@@ -48,15 +50,18 @@ def create_train_step(get_metrics, model_args):
         clean_signal, noisy_approx = batch
         z_rng, dropout_rng = random.split(rng)
 
-        def loss_fn(params, batch_stats):
+        # def loss_fn(params, batch_stats):
+        def loss_fn(params):
             # Apply the model with mutable batch_stats
-            (prediction, mean, logvar), new_state = models.model(
+            # (prediction, mean, logvar), new_state = models.model(
+            prediction, new_state = models.model(
                 hidden=model_args["hidden"],
                 latents=model_args["latents"],
                 dropout_rate=model_args["dropout_rate"],
                 io_dim=model_args["io_dim"],
+                noise_std=model_args["noise_std"],
             ).apply(
-                {'params': params, 'batch_stats': batch_stats},
+                {'params': params},# 'batch_stats': batch_stats},
                 x=noisy_approx,
                 z_rng=z_rng,
                 deterministic=False,
@@ -64,16 +69,18 @@ def create_train_step(get_metrics, model_args):
                 rngs={'dropout': dropout_rng},
             )
 
-            loss = get_metrics(clean_signal, noisy_approx, prediction, mean, logvar, params)["loss"]
+            loss = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)["loss"]
             return loss, new_state
 
         # Get the current batch_stats from the state
-        params, batch_stats = state.params, state.batch_stats
-        (_, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, batch_stats)
+        # params, batch_stats = state.params, state.batch_stats
+        params = state.params
+        # (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, batch_stats)
+        loss_, grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
         
         # Update the state with the new parameters and batch_stats
-        state = state.apply_gradients(grads=grads, batch_stats=new_state["batch_stats"])
-        return state
+        state = state.apply_gradients(grads=grads)
+        return state, loss_
 
     return train_step
 
@@ -83,24 +90,33 @@ def create_eval_f(get_metrics, model_args):
     def eval_f(state, batch, z_rng):
         
         # Unpack the inputs
-        params, batch_stats = state.params, state.batch_stats
+        # params, batch_stats = state.params, state.batch_stats
+        params = state.params
         clean_signal, noisy_approx = batch
         
         # Apply the model in evaluation mode
-        prediction, mean, logvar = models.model(
+        # prediction, mean, logvar = models.model(
+        prediction = models.model(
             hidden=model_args["hidden"],
             latents=model_args["latents"],
             dropout_rate=model_args["dropout_rate"],
             io_dim=model_args["io_dim"],
+            noise_std=model_args["noise_std"],
         ).apply(
-            {'params': params, 'batch_stats': batch_stats},
+            {'params': params}, #'batch_stats': batch_stats},
             x=noisy_approx,
             z_rng=z_rng,
             deterministic=True,
             mutable=False  # No need to update batch_stats during evaluation
         )
+        # std_dx = prediction
+        # prediction = noisy_approx + prediction * model_args["noise_std"]
         
-        metrics = get_metrics(clean_signal, noisy_approx, prediction, mean, logvar, params)
+        # jax.debug.print("sdt_dx example: {}", std_dx[0])
+        # jax.debug.print("sdt_dx example mean: {}", std_dx.mean(axis=0).mean())
+        # jax.debug.print("sdt_dx example std: {}", std_dx.std(axis=0).mean())
+
+        metrics = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)
         return metrics
 
     return eval_f
@@ -112,34 +128,34 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
-    rng = random.key(jnp.int64(2000))
+    rng = random.key(2000)
     rng, init_rng, example_rng, z_rng, io_rng  = random.split(rng, 5)
-    
-    # Define the test data parameters
-    data_args = {
-        "params": {
-            "a_min": 0,
-            "a_max": 1,
-            "tau_min": 20,
-            "tau_max": 260,
-            "decay_count": 2,
-        },
-        "t_max": 400, 
-        "t_len": 1120, 
-        "SNR": 100,
-        "wavelet": "coif6", 
-        "mode": "zero",
-        "dtype": jnp.float32,
-    }
     
     # Generate extract the input/output dimensions and maximum number of 
     # dwt transforms allowed from this length signal
-    io_dim, max_dwt_level = utils.get_approx_length(data_args["t_len"], data_args["wavelet"])
+    io_dim, max_dwt_level = utils.get_approx_length(config.data_args["t_len"], config.data_args["wavelet"])
     logging.info(f"io_dim: {io_dim}")
     if io_dim != config.io_dim:
         logging.info(f"Warning: io_dim ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
     
-    data_args["max_dwt_level"] = max_dwt_level
+    # Update the config with the correct io_dim and max_dwt_level
+    with config.unlocked():
+        config.io_dim = io_dim
+        config.data_args["max_dwt_level"] = max_dwt_level
+    
+    # Create the data generator
+    data_generator = input_pipeline.create_data_generator(config.data_args)
+    
+    # Use the data generateor to create an example batch so that losses can be 
+    # meaningfully normalized to the noisy data
+    example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
+    get_metrics = loss.create_compute_metrics(config.loss_scaling, example_batch, config.data_args["wavelet"], config.data_args["mode"])
+    noise_std = data_processing.get_noise_std(example_batch, config.data_args["wavelet"], config.data_args["mode"], max_dwt_level)
+
+    noise_std = jnp.array([std if std > 0 else jnp.min(noise_std[noise_std > 0]) for std in noise_std])
+    
+    print(f"noise_std: {noise_std}")
+    
     
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
@@ -161,33 +177,27 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             "latents": config.latents,
             "hidden": config.hidden,
             "dropout_rate": config.dropout_rate, 
-            "io_dim": io_dim,
-            "dtype": data_args["dtype"],
+            "io_dim": config.io_dim,
+            "dtype": config.data_args["dtype"],
+            "noise_std": noise_std,
         }
         
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
-        init_data = jnp.ones((config.batch_size, io_dim), dtype=data_args["dtype"])
+        init_data = jnp.ones((config.batch_size, config.io_dim), dtype=config.data_args["dtype"])
         
         variables = models.model(**model_args).init(init_rng, init_data, z_rng, deterministic=True)
         params = variables['params']
-        batch_stats = variables['batch_stats']
+        # batch_stats = variables['batch_stats']
         
         # Initialize the training state including the optimizer
         state = CustomTrainState.create(
             apply_fn=models.model(**model_args).apply,
             params=params,
             tx=optax.adam(create_learning_rate_scheduler(config)),
-            batch_stats=batch_stats,  # Include batch_stats in the state
+            # batch_stats=batch_stats,  # Include batch_stats in the state
         )
-        
-    # Create the data generator
-    data_generator = input_pipeline.create_data_generator(data_args)
     
-    # Use the data generateor to create an example batch so that losses can be 
-    # meaningfully normalized to the noisy data
-    example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
-    get_metrics = loss.create_compute_metrics(config.loss_scaling, example_batch, data_args["wavelet"], data_args["mode"])
     
     # # This section creates a second example batch to verify that the loss normalization is working correctly
     # example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
@@ -205,13 +215,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     logging.info(
         f"This training instance has the following details:\n"
         f"configs: {config}\n"
-        f"data_args: {data_args}\n"
+        f"config.data_args: {config.data_args}\n"
     )
     # Clear memory
     del example_batch, time_keeping, init_rng, example_rng, z_rng, io_rng
     
     # We want to verify that all of the data has the jnp.float64 type
-    # print(f"Intended Data type: {data_args['dtype']}")
+    # print(f"Intended Data type: {config.data_args['dtype']}")
     
     # Train the model
     for epoch in range(config.num_epochs):
@@ -233,9 +243,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         ))
         
         # Train the model for one epoch
-        for batch in train_ds:
-            rng, train_rng = random.split(rng)
-            state = train_step(state, batch, train_rng)
+        for i in range(2):
+            for j in range(config.epoch_size//config.batch_size):
+                batch = next(train_ds)
+                rng, train_rng = random.split(rng)
+                state, loss_ = train_step(state, batch, train_rng)
+                if j+1 % 4 == 0:
+                    print("loss{" + f"{i}:{j}" +"}: "+f"{loss_[0]}")
+                
         
         # Evaluate the model
         rng, eval_rng = random.split(rng)
@@ -257,7 +272,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             rng, test_rng, z_rng = random.split(rng, 3)
             test_batch = next(data_generator(
                 key=test_rng, 
-                n=config.batch_size*5
+                n=config.batch_size
             ))
             metrics = eval_f(state, test_batch, eval_rng)
             

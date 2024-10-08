@@ -140,7 +140,7 @@ def fft_losses(clean_signal, noisy_signal, prediction_signal):
 
 #### ~~~~ Define the loss functions dict ~~~~ ####
 
-SCALE_AGNOSTIC_LOSSES = ["l2", "kl"]
+SCALE_AGNOSTIC_LOSSES = ["l2", "kl", "output_std"]
 
 def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavelet, mode):
     """
@@ -158,7 +158,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     """
     
     # Define compute metrics function with scaled loss weights
-    def compute_metrics(clean_signal, noisy_approx, recon_approx, mean, logvar, model_params):
+    def compute_metrics(clean_signal, noisy_approx, recon_approx, std_dx, mean, logvar, model_params):
         """
         Computes metrics with scaled loss weights.
         
@@ -200,6 +200,10 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
             metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         if "l2" in loss_scaling:
             metrics["l2"] = get_l2_loss(model_params)
+        if "output_std" in loss_scaling:
+            mean = jnp.mean(std_dx, axis=0)
+            logvar = jnp.log(jnp.var(std_dx, axis=0))
+            metrics["output_std"] = get_kl_divergence_lognorm(mean, logvar).mean()
         
         for key in loss_scaling.keys():
             metrics[key] *= scaled_weights[key]
@@ -219,6 +223,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         "fft_p_max": 0.02,
         "l2": 0.003,
         "kl": 0.000005,
+        "output_std": 1.0,
         # "l2": 0.00002,
         # "kl": 0.000006,
     }
@@ -242,7 +247,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
         
         # Compute example metrics for each loss type
-        example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, None, None, None)
+        example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, jnp.array([0.5, -0.5]), None, None, None)
         
         loss_scaling.update(scale_agnostic_scaling)
        

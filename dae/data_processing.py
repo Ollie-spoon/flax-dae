@@ -2,6 +2,9 @@
 # import matplotlib.pyplot as plt
 # import pywt
 import jax
+import jax.numpy as jnp
+from cr.wavelets import wavedec, downcoef
+
 
 # # lets generate a test exponential decay
 
@@ -57,3 +60,36 @@ import jax
 @jax.vmap
 def add_difference(noisy_data, difference):
     return noisy_data + difference
+
+def create_multi_exponential_decay(t):
+    def multi_exponential_decay(params):
+        decay = jnp.sum(params[::2] * jnp.exp(-t[:, None] / params[1::2]), axis=1)
+        return decay
+    return jax.jit(multi_exponential_decay)
+
+def create_wavelet_decomposition(wavelet, mode):
+    def wavelet_decomposition(data):
+        coeffs = wavedec(data=data, wavelet=wavelet, mode=mode)
+        return coeffs
+    return jax.jit(wavelet_decomposition)
+
+def create_wavelet_approx(wavelet, mode, max_dwt_level):
+    def wavelet_approx(data):
+        coeffs = downcoef(part='a', data=data, wavelet=wavelet, mode=mode, level=max_dwt_level)
+        return coeffs
+    return jax.jit(wavelet_approx)
+
+# We now want to analyse the example batch and extract from it the standard 
+# deviation of the noise from each point in the signal across the batch
+def get_noise_std(batch, wavelet, mode, max_dwt_level):
+    clean_signal, noisy_approx = batch
+    
+    # Calculate the clean approximation
+    wavelt_approx = create_wavelet_approx(wavelet, mode, max_dwt_level)
+    clean_approx = jax.vmap(wavelt_approx)(clean_signal)
+    
+    # Calculate the difference between the noisy data and the noisy approximation
+    difference = noisy_approx - clean_approx
+    # Calculate the standard deviation of the difference across the batch
+    noise_std = jnp.std(difference, axis=0)
+    return noise_std
