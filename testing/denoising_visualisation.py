@@ -128,8 +128,15 @@ def denoise_bi_exponential():
     number_of_signals = 1000
     number_of_optimizations = 200
     
-    # We're now going to loop through the batch and apply n approximations to each.
-    for i in range(noisy_approx.shape[0]):
+    # We're going to loop through n sinals and apply m optimizations to each.
+    # The idea is that we're going to find many local minima and then use a clustering algorithm
+    # to find the best local minima. 
+    # 
+    # The clustering will identify clusters of local minima that are close to each other.
+    # We will then take the medoid of the medoid cluster as our approximation for the local minimum.
+    for signal_i in range(number_of_signals):
+        # We're now going to loop through the batch and apply n approximations to each.
+    
         
         
     
