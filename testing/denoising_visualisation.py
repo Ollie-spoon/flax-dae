@@ -104,6 +104,35 @@ def denoise_bi_exponential():
     # # permanent_saves\thurs_19_latent_30.pkl: Pretty good, but I'm not sure if it's the best.
     # # permanent_saves\fft_m_max.pkl: 
 
+    ## ~~ Optimization Clustering Minimum ~~ ##
+    
+    data_args = {
+        "params": {
+            "a_min": 0,
+            "a_max": 1,
+            "tau_min": 5,
+            "tau_max": 300,
+            "decay_count": 2,
+        },
+        "t_max": 400, 
+        "t_len": 1120, 
+        "SNR": 100,
+        "wavelet": "coif6", 
+        "mode": "zero",
+        "dtype": jnp.float32,
+        "max_dwt_level": 5,
+    }
+    
+    data_generator = create_data_generator(data_args)
+    
+    number_of_signals = 1000
+    number_of_optimizations = 200
+    
+    # We're now going to loop through the batch and apply n approximations to each.
+    for i in range(noisy_approx.shape[0]):
+        
+        
+    
     # ## ~~ Evaluation ~~ ##
     
     # data_args = {

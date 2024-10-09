@@ -54,7 +54,7 @@ def create_train_step(get_metrics, model_args):
         def loss_fn(params):
             # Apply the model with mutable batch_stats
             # (prediction, mean, logvar), new_state = models.model(
-            prediction, new_state = models.model(
+            prediction = models.model(
                 hidden=model_args["hidden"],
                 latents=model_args["latents"],
                 dropout_rate=model_args["dropout_rate"],
@@ -65,22 +65,27 @@ def create_train_step(get_metrics, model_args):
                 x=noisy_approx,
                 z_rng=z_rng,
                 deterministic=False,
-                mutable=["batch_stats"],
+                # mutable=["batch_stats"],
                 rngs={'dropout': dropout_rng},
             )
+            
+            # jax.debug.print("prediction shape: {}", len(prediction))
+            # jax.debug.print("prediction shape: {}", prediction.shape)
+            # jax.debug.print("prediction example: {}", prediction[0])
 
             loss = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)["loss"]
-            return loss, new_state
+            return loss
 
         # Get the current batch_stats from the state
         # params, batch_stats = state.params, state.batch_stats
         params = state.params
         # (loss, new_state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, batch_stats)
-        loss_, grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+        loss, grads = jax.value_and_grad(loss_fn)(params)
+        # grads = jax.grad(loss_fn)(params)
         
         # Update the state with the new parameters and batch_stats
         state = state.apply_gradients(grads=grads)
-        return state, loss_
+        return state, loss
 
     return train_step
 
@@ -107,7 +112,7 @@ def create_eval_f(get_metrics, model_args):
             x=noisy_approx,
             z_rng=z_rng,
             deterministic=True,
-            mutable=False  # No need to update batch_stats during evaluation
+            # mutable=False  # No need to update batch_stats during evaluation
         )
         # std_dx = prediction
         # prediction = noisy_approx + prediction * model_args["noise_std"]
@@ -156,15 +161,16 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     
     print(f"noise_std: {noise_std}")
     
+    # noise_std = jnp.ones_like(noise_std)
     
     # Initialize the model and the training state
     if config.checkpoint_restore_path != '':
         # Restore the model and the optimizer state
-        params, opt_state, model_args = utils.load_model(working_dir + config.checkpoint_restore_path)
+        params, opt_state, model_args, step = utils.load_model(working_dir + config.checkpoint_restore_path)
 
         # Restore the train state
         state = CustomTrainState(
-            step=1000*10000,  # Restore the step count from opt_state
+            step=step,  # Restore the step count from opt_state
             apply_fn=models.model(**model_args).apply,
             params=params,
             tx=optax.adam(create_learning_rate_scheduler(config)),
@@ -243,13 +249,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         ))
         
         # Train the model for one epoch
-        for i in range(2):
+        for i in range(5):
             for j in range(config.epoch_size//config.batch_size):
                 batch = next(train_ds)
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
-                if j+1 % 4 == 0:
-                    print("loss{" + f"{i}:{j}" +"}: "+f"{loss_[0]}")
+                # state = train_step(state, batch, train_rng)
+                if (j+1) % 1 == 0:
+                    print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
         
         # Evaluate the model
@@ -266,7 +273,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 break
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch > config.num_epochs/20 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
             
             # Create a validation data set 
             rng, test_rng, z_rng = random.split(rng, 3)

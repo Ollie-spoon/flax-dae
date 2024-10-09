@@ -248,13 +248,13 @@ class UNet(nn.Module):
     def __call__(self, x, z_rng, deterministic: bool):
         assert self.kernel_size % 2 == 1, "Kernel size must be odd."
         
-        x = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
+        x0 = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
         
         # jax.debug.print("input: {}", x.shape)
         
         # Contracting path (Encoder)
         # Initial convolutional block
-        x0 = ConvolutionalBlock(self.features, self.kernel_size, self.padding, deterministic)(x)
+        x0 = ConvolutionalBlock(self.features, self.kernel_size, self.padding, deterministic)(x0)
         x0 = ConvolutionalBlock(self.features, self.kernel_size, self.padding, deterministic)(x0)
         
         # jax.debug.print("x0: {}", x0.shape)
@@ -288,7 +288,18 @@ class UNet(nn.Module):
         
         x0 = jnp.reshape(x0, (x0.shape[0], x0.shape[1]))
         
-        return x0
+        # x0 = nn.Dense(features=self.io_dim)(x0)
+        # x0 = nn.gelu(x0)
+        # # x_ = nn.Dropout(rate=0.2)(x_, deterministic=deterministic)
+        
+
+        x_sign = nn.Dense(features=self.io_dim)(x0)
+        x_power = nn.Dense(features=self.io_dim)(x0)
+        
+        x = reparameterize_dx(z_rng, x_sign, x_power, deterministic)
+        
+        
+        return x #+ x
 
 class ConvolutionalBlock(nn.Module):
     
@@ -332,7 +343,7 @@ class UNetUpLayer(nn.Module):
     
     @nn.compact
     def __call__(self, x, x_skip):
-        x = nn.ConvTranspose(features=self.features, kernel_size=(self.kernel_size), strides=(2), padding=self.padding)(x)
+        x = nn.ConvTranspose(features=self.features, kernel_size=(self.kernel_size), strides=(2), padding='SAME')(x)
         
         x = jnp.concatenate([x_skip, x], axis=-1)  # Skip connection
         

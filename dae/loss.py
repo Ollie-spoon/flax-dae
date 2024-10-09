@@ -113,7 +113,7 @@ def create_noise_injection(wavelet, mode):
 def fft_losses(clean_signal, noisy_signal, prediction_signal):
     clean_fft = jnp.fft.fft(clean_signal)
     pred_fft = jnp.fft.fft(prediction_signal)
-    noisy_fft = jnp.fft.fft(noisy_signal)
+    # noisy_fft = jnp.fft.fft(noisy_signal)
     
     clean_mag = jnp.abs(clean_fft)[0:68]
     clean_phase = jnp.angle(clean_fft)[0:68]
@@ -121,20 +121,26 @@ def fft_losses(clean_signal, noisy_signal, prediction_signal):
     pred_mag = jnp.abs(pred_fft)[0:68]
     pred_phase = jnp.angle(pred_fft)[0:68]
     
-    noisy_mag = jnp.abs(noisy_fft)[0:68]
-    noisy_phase = jnp.angle(noisy_fft)[0:68]
+    # noisy_mag = jnp.abs(noisy_fft)[0:68]
+    # noisy_phase = jnp.angle(noisy_fft)[0:68]
+    
+    mag_diff = jnp.abs(clean_mag - pred_mag)
+    phase_diff = jnp.abs(clean_phase - pred_phase)
     
     mag_mean = jnp.sqrt(
-        jnp.mean(jnp.square(clean_mag - pred_mag)) +
-        jnp.mean(jnp.abs(clean_mag - pred_mag))
-        )
-    phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))
+        jnp.mean(jnp.square(mag_diff)) +
+        jnp.mean(mag_diff)
+    )
+    phase_mean = jnp.sqrt(
+        jnp.mean(jnp.square(phase_diff)) + 
+        jnp.mean(phase_diff)
+    )
     
-    mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
-    phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
+    # mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
+    # phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
     
-    # mag_max = jnp.max(jnp.abs(clean_mag - pred_mag))*mag_max_scale
-    # phase_max = jnp.max(jnp.abs(clean_phase - pred_phase))*phase_max_scale
+    mag_max = jnp.max(mag_diff)
+    phase_max = jnp.max(phase_diff)
     
     return mag_mean, phase_mean, mag_max, phase_max
 
