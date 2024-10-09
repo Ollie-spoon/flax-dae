@@ -2,9 +2,20 @@
 
 This repository contains a Flax-based Denoising Autoencoder, designed as an initial test to remove low-frequency noise from noisy multi-exponential decay data. The data originates from NMR CPMG T2 relaxometry signals, which are used to assess fluid levels in patients with chronic kidney disease (CKD).
 
+NOTE: THIS REPOSITORY CONTAINS ACTIVE RESEARCH, IT IS NOT FULLY COMMENTED AND THERE ARE PARTS OF IT THAT ARE OBJECTIVELY DISGUSTING. HOWEVER, I WOULD POINT OUT THAT BATCH GENERATION, TRAINING, AND TESTING ARE ALL ENTIRELY JIT COMPILED AND VMAPPED WHERE APPROPRIATE. 
+
+Did you know that there's a JIT compatible wavelet library [CR-Wavelet](https://github.com/carnotresearch/cr-wavelets).!
+
+Also at this point the model has gone through the following iterations
+1. Autoencoder
+2. Variational Autoencoder
+3. Convolutional Neural Network + Small MLP
+4. Convolutional Variational Autoencoder
+5. U-Net 
+
 ## Project Overview
 
-In my current research at the **Cima Lab** in the **MIT Koch Institute**, we aim to improve the processing of NMR data for more accurate fluid level identification in CKD patients. This specific project focuses on using a Denoising Autoencoder (DAE) to clean noisy exponential decay signals, allowing for more accurate analysis and diagnosis.
+In my current research at the **Cima Lab** in the **MIT Koch Institute**, we aim to improve the processing of NMR data for more accurate fluid level identification in CKD patients. This specific project focuses on using ML models to clean noisy exponential decay signals, allowing for more accurate analysis and diagnosis.
 
 This repository implements a modified version of the **Variational Autoencoder** example found in the [Flax documentation](https://github.com/google/flax/tree/main/examples/vae).
 
@@ -30,7 +41,7 @@ The research that I have conducted thus far on denoising multi-exponential decay
 - **Wavelet Denoising**: Applying wavelet transforms to reduce high-frequency noise while preserving signal integrity.
 - **Analytical Solving Methods**: including the Pade-Laplace method and the Prony method.
 - **Optimization Techniques**: methods such as non-linear least squares regression and Bayesian parameter estimation.
-- **Multi-Exponential Decay Resolution Analysis**: Investigating the limits of resolving power for separating closely spaced decay constants. A good rule of thumb is that you wont resolve two peaks within 2x of one another with an SNR of less than 200.
+- **Multi-Exponential Decay Resolution Analysis**: Investigating the limits of resolving power for separating closely spaced decay constants. A good rule of thumb is that you wont resolve two peaks within 2x of one another with an SNR of less than 100.
 - **Filtering Methods**: Including but not limited to the moving average, mean displacement ratio, and the Provencher filter.
 
-The bible for multi-exponential analysis can be found [here](https://pubs.aip.org/aip/rsi/article/70/2/1233/438854/Exponential-analysis-in-physical-phenomena).
+The bible for traditional multi-exponential analysis can be found [here](https://pubs.aip.org/aip/rsi/article/70/2/1233/438854/Exponential-analysis-in-physical-phenomena).
