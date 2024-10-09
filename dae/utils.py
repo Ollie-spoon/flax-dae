@@ -108,7 +108,8 @@ def save_model(state, step: int, ckpt_dir: str, model_args: dict, logging=True):
     checkpoint = {
         'params': state.params,
         'opt_state': state.opt_state,
-        'model_args': model_args
+        'model_args': model_args,
+        'step': state.step,
     }
 
     save_path = os.path.join(ckpt_dir, f'checkpoint_{step}.pkl')
@@ -138,9 +139,10 @@ def load_model(ckpt_path: str):
     params = checkpoint['params']
     opt_state = checkpoint['opt_state']
     model_args = checkpoint['model_args']
+    step = checkpoint['step']
     
     print(f"Checkpoint loaded from {load_path}")
-    return params, opt_state, model_args
+    return params, opt_state, model_args, step
 
 def __convert_to_path(string):
     if isinstance(string, str):
