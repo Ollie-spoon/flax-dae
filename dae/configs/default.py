@@ -12,20 +12,30 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [1, 0.0004],
-        [10, 0.0003], 
-        [30, 0.0002], 
-        [50, 0.0001], 
-        [60, 0.00009], 
-        [70, 0.00008], 
-        [80, 0.00007], 
-        [90, 0.00006], 
-        [100, 0.00005],
-        [150, 0.000035],
-        [200, 0.00002], 
-        [300, 0.00001], 
-        [400, 0.000005], 
-        [600, 0.000001], 
+        [1, 0.75],
+        [5, 0.01],
+        [19, 0.005],
+        [33, 0.002],
+        [57, 0.001],
+        [91, 0.0005],
+        
+        # loss{0:0}: 1.5400043532630622e+19
+        # loss{0:1}: nan
+        
+        # [1, 0.0004],
+        # [10, 0.0003], 
+        # [30, 0.0002], 
+        # [50, 0.0001], 
+        # [60, 0.00009], 
+        # [70, 0.00008], 
+        # [80, 0.00007], 
+        # [90, 0.00006], 
+        # [100, 0.00005],
+        # [150, 0.000035],
+        # [200, 0.00002], 
+        # [300, 0.00001], 
+        # [400, 0.000005], 
+        # [600, 0.000001], 
         
         # [5000, 0.0001],
         # [20000, 0.00004],
@@ -61,13 +71,14 @@ def get_config():
         "mode": "zero",
         "dtype": float32,
     }
-    config.latents = 20
+    config.latents = 4
     config.hidden = 20
     config.dropout_rate = 0.1
     config.io_dim = 68
     config.batch_size = 200
     config.epoch_size = 2000
-    config.num_epochs = 200
+    config.num_epochs = 100
+    config.cycles_per_epoch = 2
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
     return config

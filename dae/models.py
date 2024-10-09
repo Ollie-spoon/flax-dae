@@ -149,23 +149,23 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
     #     io_dim=io_dim,
     #     dtype=dtype,
     # )
-    # return CNN(
+    return CNN(
+        kernel_size=5,
+        io_dim=io_dim,
+        features=hidden,
+        dropout_rate=dropout_rate,
+        noise_std=noise_std,
+    )
+    # return UNet(
     #     kernel_size=7,
     #     io_dim=io_dim,
     #     features=hidden,
-    #     dropout_rate=dropout_rate,
-    #     noise_std=noise_std,
+    #     padding='SAME',
     # )
-    return UNet(
-        kernel_size=7,
-        io_dim=io_dim,
-        features=hidden,
-        padding='SAME',
-    )
 
 
 class CNN(nn.Module):
-    """Convolutional model."""
+    """Convolutional model, currently an autoencoder."""
     
     kernel_size: int
     io_dim: int
@@ -177,38 +177,93 @@ class CNN(nn.Module):
     def __call__(self, x, z_rng, deterministic: bool):
         assert self.kernel_size % 2 == 1, "Kernel size must be odd."
         
-        dx = nn.Conv(features=self.features, kernel_size=(self.kernel_size))(x)
-        dx = nn.gelu(dx)
-        dx = nn.Conv(features=self.features, kernel_size=(self.kernel_size))(dx)
-        dx = nn.gelu(dx)
-        dx = nn.Conv(features=self.features, kernel_size=(self.kernel_size))(dx)
-        dx = nn.gelu(dx)
-        dx = nn.Conv(features=self.features, kernel_size=(self.kernel_size))(dx)
-        dx = nn.gelu(dx)
-        dx = nn.Conv(features=1, kernel_size=(self.kernel_size))(dx)
-        dx = nn.gelu(dx)
+        x = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
         
-        # Hidden layer 1  (io_dim -> hidden)
-        dx = nn.Dense(features=self.io_dim*2)(dx)
-        dx = nn.gelu(dx)
-        dx = nn.Dropout(rate=self.dropout_rate)(dx, deterministic=deterministic)
+        # Starting size = 1120
+        # Ending size = 68
         
-        # Output layer in two parts  (hidden -> io_dim)
-        # sign = nn.Dense(features=self.io_dim)(dx)
-        # sign = nn.sigmoid(sign)
+        # (1120 - (4*2))/2 = 556
+        # (556 - (4*2))/2 = 274
+        # (274 - (4*2))/2 = 133
+        # (133 - (4*2))/2 = 64
+        # (64 - (4*2))/2 = 28
         
-        # power = nn.Dense(features=self.io_dim)(dx)
-        # power = nn.sigmoid(power)
+        # jax.debug.print("x0: {}", x.shape)
         
-        # dx = reparameterize_dx(z_rng, sign, power, deterministic)
+        # Initial convolutional block (1120 -> 1112)
+        x = ConvolutionalBlock(self.features, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features, self.kernel_size, 'VALID', deterministic)(x)
         
-        dx = nn.Dense(features=self.io_dim)(dx)
+        # jax.debug.print("x1: {}", x.shape)
         
-        # dx_sum = jnp.sum(jnp.abs(dx))
-        # dx = jnp.where(dx_sum < self.io_dim/10, dx, dx/dx_sum)
-        # jax.debug.print("dx: ", dx)
+        # Layer 1 (1112 -> 556 -> 548)
+        # Pooling (1112 -> 556)
+        x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
         
-        return dx
+        # Convolutional block (556 -> 548)
+        x = ConvolutionalBlock(self.features*2, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features*2, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x2: {}", x.shape)
+        
+        # Layer 2 (548 -> 274 -> 266)
+        # Pooling (548 -> 274)
+        x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        
+        # Convolutional block (274 -> 266)
+        x = ConvolutionalBlock(self.features*4, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features*4, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x3: {}", x.shape)
+        
+        # Layer 3 (266 -> 133 -> 125)
+        # Pooling (266 -> 133)
+        x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        
+        # Convolutional block (133 -> 125)
+        x = ConvolutionalBlock(self.features*8, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features*8, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x4: {}", x.shape)
+        
+        # Layer 4 (125 -> 62 -> 54)
+        # Pooling (125 -> 62)
+        x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        
+        # Convolutional block (62 -> 54)
+        x = ConvolutionalBlock(self.features*16, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features*16, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x5: {}", x.shape)
+        
+        # Layer 5 (54 -> 27 -> 19)
+        # Pooling (54 -> 27)
+        x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        
+        # Convolutional block (27 -> 19)
+        x = ConvolutionalBlock(self.features*32, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features*32, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x6: {}", x.shape)
+        
+        # Flatten (19 -> 19)
+        x = nn.Conv(features=1, kernel_size=(1, 1), padding='VALID')(x)
+        x = nn.gelu(x)
+        x = jnp.reshape(x, (x.shape[0], x.shape[1]))
+        
+        # jax.debug.print("x7: {}", x.shape)
+        
+        # Fully connected layer (19 -> 136)
+        x = nn.Dense(features=self.io_dim*2)(x)
+        x = nn.gelu(x)
+        x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+        
+        # jax.debug.print("x8: {}", x.shape)
+        
+        # Output layer (136 -> 68)
+        x = nn.Dense(features=self.io_dim)(x)
+
+        return x
     
     
     # @nn.compact

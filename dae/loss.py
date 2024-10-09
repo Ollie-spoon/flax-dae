@@ -235,7 +235,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     }
     
     # Extract data from example batch
-    clean_signal, noisy_approx = example_batch
+    clean_signal, noisy_approx, _ = example_batch
     
     # Compute example metrics using baseline weights
     noise_injection = create_noise_injection(wavelet, mode)

@@ -82,7 +82,7 @@ def create_wavelet_approx(wavelet, mode, max_dwt_level):
 # We now want to analyse the example batch and extract from it the standard 
 # deviation of the noise from each point in the signal across the batch
 def get_noise_std(batch, wavelet, mode, max_dwt_level):
-    clean_signal, noisy_approx = batch
+    clean_signal, noisy_approx, _ = batch
     
     # Calculate the clean approximation
     wavelt_approx = create_wavelet_approx(wavelet, mode, max_dwt_level)

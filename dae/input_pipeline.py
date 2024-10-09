@@ -17,6 +17,7 @@ def create_data_generator(kwargs):
         
         clean_signal = data[0]  # Noiseless version in the time domain
         noisy_approx = data[1]  # Noisy version of the approximation coefficient
+        noisy_signal = data[2]  # Noisy version in the time domain
         
         if batch_size is None:
             batch_size = n  # Default batch size is all data
@@ -31,154 +32,52 @@ def create_data_generator(kwargs):
             indices = random.permutation(key, n)  # JAX-based shuffling
             shuffled_clean_signal = clean_signal[indices]
             shuffled_noisy_approx = noisy_approx[indices]
+            shuffled_noisy_signal = noisy_signal[indices]
 
             # Reshape into batches
             clean_signal_batched = shuffled_clean_signal.reshape((num_batches, batch_size, *clean_signal.shape[1:]))
             noisy_approx_batched = shuffled_noisy_approx.reshape((num_batches, batch_size, *noisy_approx.shape[1:]))
-            return clean_signal_batched, noisy_approx_batched
+            noisy_signal_batched = shuffled_noisy_signal.reshape((num_batches, batch_size, *noisy_signal.shape[1:]))
+            return clean_signal_batched, noisy_approx_batched, noisy_signal_batched
 
         # Define a looped batch iterator that reshuffles after each pass
         def batch_iterator(rng):
             while True:
                 # Shuffle the entire dataset using JAX's random module
                 rng, key = random.split(rng)
-                clean_signal_batched, noisy_approx_batched = shuffle_data(key, clean_signal, noisy_approx)
+                clean_signal_batched, noisy_approx_batched, noisy_signal_batched = shuffle_data(key, clean_signal, noisy_approx)
                 
                 # Yield each batch one by one in sequence
                 for i in range(num_batches):
-                    yield clean_signal_batched[i], noisy_approx_batched[i]
+                    yield clean_signal_batched[i], noisy_approx_batched[i], noisy_signal_batched[i]
 
         return batch_iterator(rng)
 
     return data_generator
 
-
-
-
-def load_data(data_path, test_size=0.1):
-    # Load the .npy file
-    data = jnp.load(data_path)
-    
-    # Split the data into noisy (input) and noiseless (target)
-    noisy_data = data[:, 0, :]  # Noisy version
-    noiseless_data = data[:, 1, :]  # Noiseless version
-    
-    # Split into training and testing sets
-    split_point = int(len(noisy_data) * (1 - test_size))
-    train_noisy, test_noisy = noisy_data[:split_point], noisy_data[split_point:]
-    train_noiseless, test_noiseless = noiseless_data[:split_point], noiseless_data[split_point:]
-    
-    return (train_noisy, train_noiseless), (test_noisy, test_noiseless)
-
-# # instead of loading the data from a file, we will generate it
-# def generate_original_data(key: jnp.ndarray, iterations: int, batch_size: int, kwargs):
-#     # print("Generating data.")
-#     # print("diagnostics: \niterations: ", iterations, "\ntrain: ", train, "\nbatch_size: ", batch_size, "\nkwargs: ", kwargs)
-    
-#     kwargs["iterations"] = iterations
-#     data = generate_basic_data(key=key, **kwargs)
-    
-#     noisy_data = data[:, 0, :]  # Noisy version
-#     noiseless_data = data[:, 1, :]  # Noiseless version
-    
-#     ds = tf.data.Dataset.from_tensor_slices((noisy_data, noiseless_data))
-    
-#     # No need to cache, shuffle, or repeat the dataset
-#     ds = ds.batch(batch_size)
-    
-#     return iter(tfds.as_numpy(ds))
-
-
-# def build_train_set(data_path, batch_size):
-#     """Builds a training dataset from custom data."""
-#     # Load the data
-#     (noisy_data, noiseless_data), _ = load_data(data_path)
-    
-#     print("Data loaded.")
-#     # Calculate steps per epoch
-#     num_samples = noisy_data.shape[0]
-    
-#     # Create a tf.data.Dataset object
-#     train_ds = tf.data.Dataset.from_tensor_slices((noisy_data, noiseless_data))
-    
-#     # Apply the image loading and processing function
-#     # train_ds = train_ds.map(load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-#     # Shuffle, repeat, and batch the dataset
-#     train_ds = train_ds.cache()
-#     train_ds = train_ds.shuffle(1800)
-#     train_ds = train_ds.repeat()
-#     train_ds = train_ds.batch(batch_size)
-    
-#     print("Data batched and shuffled.")
-    
-#     # Return the dataset as a Numpy iterable
-#     return iter(tfds.as_numpy(train_ds)), num_samples
-
-# def build_test_set(data_path, batch_size=200):
-#     """Builds a testing dataset from custom data."""
-#     # Load the data
-#     _, (noisy_data, noiseless_data) = load_data(data_path)
-    
-#     # Calculate steps per epoch
-#     num_samples = noisy_data.shape[0]
-    
-#     # Create a tf.data.Dataset object
-#     test_ds = tf.data.Dataset.from_tensor_slices((noisy_data, noiseless_data))
-    
-#     # Apply the image loading and processing function
-#     # test_ds = test_ds.map(load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-#     test_ds = test_ds.batch(num_samples)
-    
-#     # Return the dataset as a Numpy iterable
-#     return iter(tfds.as_numpy(test_ds)), num_samples
-
-# print("Initializing dataset.")
-# data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
-# batch_size = 100
-# data = build_train_set(data_path, batch_size)
-
-# print(data)
-
-
-## THIS IS THE ORIGINAL IMAGE BASED IMPLEMENTATION OF THE INPUT PIPELINE
-
-# def build_train_set(batch_size, ds_builder):
-#   """Builds train dataset."""
-
-#   # Specify that this is the training set
-#   train_ds = ds_builder.as_dataset(split=tfds.Split.TRAIN)
-#   # Define the image preprocessing pipeline
-#   train_ds = train_ds.map(prepare_image)
-#   # Enable caching for faster training
-#   train_ds = train_ds.cache()
-#   # Repeat the dataset indefinitely
-#   train_ds = train_ds.repeat()
-#   # Shuffle the dataset
-#   train_ds = train_ds.shuffle(10000)
-#   # Batch the dataset according to the batch size
-#   train_ds = train_ds.batch(batch_size)
-#   # Convert the dataset to an iterable numpy array
-#   train_ds = iter(tfds.as_numpy(train_ds))
-#   return train_ds
-
-
-# def build_test_set(ds_builder):
-#   """Builds test dataset. THIS WAS A MISTAKE IN THE DOCS"""
-#   # When compared to the train set, we don't need to cache, iter, or repeat as 
-#   # we only iterate over the test set once. We also don't need to shuffle
-  
-#   # Specify that this is the test set
-#   test_ds = ds_builder.as_dataset(split=tfds.Split.TEST)
-#   test_ds = test_ds.map(prepare_image).batch(10000)
-#   test_ds = jnp.array(list(test_ds)[0])
-#   test_ds = jax.device_put(test_ds)
-#   return test_ds
-
-
-# # Convert the image to a float32 tensor
-# def prepare_image(x):
-#   x = tf.cast(x['image'], tf.float32)
-#   x = tf.reshape(x, (-1,))
-#   return x
+# Example usage
+# data_generator = create_data_generator({
+#     "params": {
+#         "amplitude": (0.1, 1.0),
+#         "decay_count": 2,
+#         "decay_rate": (0.1, 0.5),
+#         "frequency": (0.1, 0.5),
+#         "phase": (0.1, 0.5),
+#     },
+#     "t_max": 10,
+#     "t_len": 1120,
+#     "SNR": 10,
+#     "wavelet": "coif6",
+#     "mode": "zero",
+#     "max_dwt_level": 5,
+#     "dtype": jnp.float32,
+# })
+#
+# key = random.PRNGKey(0)
+# key, subkey = random.split(key)
+# batch_iterator = data_generator(subkey, 100, 10)
+# for batch in batch_iterator:
+#     print(batch[0].shape, batch[1].shape, batch[2].shape)
+#
+# # Output:
+# # (10, 1120) (10, 68) (10, 1120)

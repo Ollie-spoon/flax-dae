@@ -23,7 +23,7 @@ class CustomTrainState(TrainState):
     pass
 
 def create_learning_rate_scheduler(config):
-    batches_per_epoch = config.epoch_size / config.batch_size
+    batches_per_epoch = config.epoch_size / config.batch_size * config.cycles_per_epoch
     schedule_array = config.learning_rate_schedule
 
     @jax.jit
@@ -47,7 +47,7 @@ def create_learning_rate_scheduler(config):
 def create_train_step(get_metrics, model_args):
     @jax.jit
     def train_step(state, batch, rng):
-        clean_signal, noisy_approx = batch
+        clean_signal, noisy_approx, noisy_signal = batch
         z_rng, dropout_rng = random.split(rng)
 
         # def loss_fn(params, batch_stats):
@@ -62,7 +62,7 @@ def create_train_step(get_metrics, model_args):
                 noise_std=model_args["noise_std"],
             ).apply(
                 {'params': params},# 'batch_stats': batch_stats},
-                x=noisy_approx,
+                x=noisy_signal,
                 z_rng=z_rng,
                 deterministic=False,
                 # mutable=["batch_stats"],
@@ -97,7 +97,7 @@ def create_eval_f(get_metrics, model_args):
         # Unpack the inputs
         # params, batch_stats = state.params, state.batch_stats
         params = state.params
-        clean_signal, noisy_approx = batch
+        clean_signal, noisy_approx, noisy_signal = batch
         
         # Apply the model in evaluation mode
         # prediction, mean, logvar = models.model(
@@ -109,7 +109,7 @@ def create_eval_f(get_metrics, model_args):
             noise_std=model_args["noise_std"],
         ).apply(
             {'params': params}, #'batch_stats': batch_stats},
-            x=noisy_approx,
+            x=noisy_signal,
             z_rng=z_rng,
             deterministic=True,
             # mutable=False  # No need to update batch_stats during evaluation
@@ -190,7 +190,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         # Initialize the model with some dummy data
         logging.info('Initializing model.')
-        init_data = jnp.ones((config.batch_size, config.io_dim), dtype=config.data_args["dtype"])
+        init_data = jnp.ones((config.batch_size, config.data_args["t_len"]), dtype=config.data_args["dtype"])
+        # init_data = jnp.ones((config.batch_size, config.io_dim), dtype=config.data_args["dtype"])
         
         variables = models.model(**model_args).init(init_rng, init_data, z_rng, deterministic=True)
         params = variables['params']
@@ -248,14 +249,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
             n=config.batch_size
         ))
         
-        # Train the model for one epoch
-        for i in range(5):
+        # Train the model for one epoch, cycle through the batch data multiple times
+        for i in range(config.cycles_per_epoch):
             for j in range(config.epoch_size//config.batch_size):
                 batch = next(train_ds)
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
                 # state = train_step(state, batch, train_rng)
-                if (j+1) % 1 == 0:
+                if (j+1) % 5 == 0:
                     print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
         
