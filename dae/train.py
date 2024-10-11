@@ -205,8 +205,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         state = CustomTrainState.create(
             apply_fn=models.model(**model_args).apply,
             params=params,
-            # tx=optax.adam(learning_rate=0.01),
-            tx=optax.adam(create_learning_rate_scheduler(config)),
+            tx=optax.adam(learning_rate=0.01),
+            # tx=optax.chain(
+            #     optax.clip_by_global_norm(10.0),
+            #     optax.adam(create_learning_rate_scheduler(config)),
+            # )
             # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
             # batch_stats=batch_stats,  # Include batch_stats in the state
         )
@@ -236,6 +239,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # We want to verify that all of the data has the jnp.float64 type
     # print(f"Intended Data type: {config.data_args['dtype']}")
     
+    prev_state = state
+    
     # Train the model
     for epoch in range(config.num_epochs):
         
@@ -262,7 +267,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
                 # state = train_step(state, batch, train_rng)
-                # if (j+1) % 5 == 0:
+                # if (j+1) % 1 == 0:
                 if (j+1) == 5:
                     print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
@@ -283,8 +288,16 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 logging.info("NaN loss detected. Exiting training.")
                 break
         
+        # Check for gradient explosion
+        if epoch > 1 and metrics["loss"] > 8 * metric_list[-2]["loss"]:
+            print(f"Loss has increased by more than an order of magnitude. Reverting.")
+            state = prev_state
+            continue
+        else:
+            prev_state = state
+        
         # Save the best model, assuming that it performs equally well on the validation set
-        if best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if best_loss*1.1 > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
         # if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
             
             # Create a validation data set 
