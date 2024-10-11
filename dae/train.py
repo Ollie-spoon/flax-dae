@@ -114,6 +114,10 @@ def create_eval_f(get_metrics, model_args):
             deterministic=True,
             # mutable=False  # No need to update batch_stats during evaluation
         )
+        
+        # Extract four predictions to produce a comparison plot
+        comparison = (clean_signal[0], noisy_approx[0], noisy_signal[0], prediction[0])
+        
         # std_dx = prediction
         # prediction = noisy_approx + prediction * model_args["noise_std"]
         
@@ -122,7 +126,7 @@ def create_eval_f(get_metrics, model_args):
         # jax.debug.print("sdt_dx example std: {}", std_dx.std(axis=0).mean())
 
         metrics = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)
-        return metrics
+        return metrics, comparison
 
     return eval_f
 
@@ -201,7 +205,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         state = CustomTrainState.create(
             apply_fn=models.model(**model_args).apply,
             params=params,
+            # tx=optax.adam(learning_rate=0.01),
             tx=optax.adam(create_learning_rate_scheduler(config)),
+            # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
             # batch_stats=batch_stats,  # Include batch_stats in the state
         )
     
@@ -256,15 +262,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
                 # state = train_step(state, batch, train_rng)
-                if (j+1) % 5 == 0:
+                if (j+1) % 1 == 0:
                     print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
         
         # Evaluate the model
         rng, eval_rng = random.split(rng)
-        metrics = eval_f(state, test_batch, eval_rng)
+        metrics, comparison = eval_f(state, test_batch, eval_rng)
         
         metric_list.append(metrics)
+        
+        # Create comparison plot
+        utils.plot_comparison(comparison, epoch+1, working_dir + 'dae/reconstruction_{}.png'.format(epoch+1))
 
         # Print the evaluation metrics
         if (epoch + 1) % 1 == 0:

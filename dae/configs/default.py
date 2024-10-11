@@ -12,12 +12,28 @@ def get_config():
 
     # config.learning_rate = 0.001
     config.learning_rate_schedule=array([
-        [1, 0.75],
-        [5, 0.01],
-        [19, 0.005],
-        [33, 0.002],
-        [57, 0.001],
-        [91, 0.0005],
+        
+        # [1, 0.000001],
+        # [5, 0.0000005],
+        # [9, 0.00002],
+        # [13, 0.00001],
+        # [17, 0.000005],
+        # [21, 0.000002],
+        
+        
+        ## All of the below lr are for adam and are waaaay too high for sgd
+        [1, 0.01],
+        # [5, 0.005],
+        # [9, 0.002],
+        # [13, 0.001],
+        # [17, 0.0005],
+        # [21, 0.0002],
+        
+        
+        # [19, 0.02],
+        # [33, 0.01],
+        # [57, 0.005],
+        # [91, 0.002],
         
         # loss{0:0}: 1.5400043532630622e+19
         # loss{0:1}: nan
@@ -75,10 +91,10 @@ def get_config():
     config.hidden = 20
     config.dropout_rate = 0.1
     config.io_dim = 68
-    config.batch_size = 200
-    config.epoch_size = 2000
+    config.batch_size = 1000
+    config.epoch_size = 10000
     config.num_epochs = 100
-    config.cycles_per_epoch = 2
+    config.cycles_per_epoch = 5
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
     return config

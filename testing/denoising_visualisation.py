@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath('C:/Users/omnic/OneDrive/Documents/MIT/Programmi
 from models import model
 from train import create_eval_f
 from input_pipeline import create_data_generator
-from generate_data import create_multi_exponential_decay, create_wavelet_approx, create_wavelet_decomposition
+from data_processing import create_multi_exponential_decay, create_wavelet_approx, create_wavelet_decomposition
 from loss import create_compute_metrics, print_metrics
 
 def denoise_bi_exponential():
@@ -125,7 +125,7 @@ def denoise_bi_exponential():
     
     data_generator = create_data_generator(data_args)
     
-    number_of_signals = 1000
+    number_of_signals = 1
     number_of_optimizations = 200
     
     # We're going to loop through n sinals and apply m optimizations to each.
@@ -134,10 +134,72 @@ def denoise_bi_exponential():
     # 
     # The clustering will identify clusters of local minima that are close to each other.
     # We will then take the medoid of the medoid cluster as our approximation for the local minimum.
-    for signal_i in range(number_of_signals):
-        # We're now going to loop through the batch and apply n approximations to each.
+    from jax.scipy.optimize import minimize
+    from sklearn.cluster import HDBSCAN
     
+    a1 = 1.0
+    tau1 = 100.0
+    t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
+    for signal_i in range(number_of_signals):
+        clean_signal = a1 * jnp.exp(-t/tau1)
+        rng, noise_key, amp_key, tau_key = random.split(rng, 4)
+        noisy_signal = clean_signal + noise_scale * random.normal(noise_key, shape=t.shape)
         
+        a0 = jax.random.uniform(key4, minval=0.5, maxval=1.5, shape=(number_of_optimizations,))
+        tau0 = jax.random.uniform(key4, minval=20, maxval=180, shape=(number_of_optimizations,))
+        
+        x0 = jnp.stack([a0, tau0], axis=1)
+        predictions = jnp.zeros((number_of_optimizations, 2))
+        
+        for optimization_i in range(number_of_optimizations):
+            # We're going to fit a clean signal to the noisy signal
+            
+            fun = lambda x: jnp.mean(jnp.square(noisy_signal - (x[0] * jnp.exp(-t/x[1]))))
+            
+            predictions[optimization_i] = minimize(fun, x0[optimization_i], method='BFGS')
+            
+        # Now we're going to cluster the predictions
+        # Perform HDBSCAN clustering
+        hdbscan = HDBSCAN(min_cluster_size=5, store_centers="medoid")
+        hdbscan.fit(predictions)
+        
+        labels = hdbscan.labels_
+        medoids = hdbscan.cluster_centers_
+        
+        # Plot the results
+        plt.scatter(predictions[:, 0], predictions[:, 1], c=labels, cmap='viridis')
+        plt.title('HDBSCAN Clustering')
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.legend()
+        plt.show()
+        
+        # Now we're going to take the medoid of the medoids
+        final_medoid = find_medoid(medoids)
+        
+        # Plot the results
+        plt.scatter(predictions[:, 0], predictions[:, 1], c=labels, cmap='viridis')
+        plt.scatter(final_medoid[0], final_medoid[1], c='red', label='Final Medoid')
+        plt.title('HDBSCAN Clustering')
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.legend()
+        plt.show()
+        
+    
+    def calculate_distances(points):
+        num_points = len(points)
+        distances = jnp.zeros((num_points, num_points))
+        for i in range(num_points):
+            for j in range(num_points):
+                distances = distances.at[i, j].set(jnp.linalg.norm(points[i] - points[j]))
+        return distances
+
+    def find_medoid(points):
+        distances = calculate_distances(points)
+        total_distances = jnp.sum(distances, axis=1)
+        medoid_index = jnp.argmin(total_distances)
+        return points[medoid_index]
         
     
     # ## ~~ Evaluation ~~ ##

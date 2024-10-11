@@ -248,7 +248,7 @@ class CNN(nn.Module):
         
         # Flatten (19 -> 19)
         x = nn.Conv(features=1, kernel_size=(1, 1), padding='VALID')(x)
-        x = nn.gelu(x)
+        # x = nn.gelu(x)
         x = jnp.reshape(x, (x.shape[0], x.shape[1]))
         
         # jax.debug.print("x7: {}", x.shape)
