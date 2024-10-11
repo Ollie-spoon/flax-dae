@@ -262,7 +262,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
                 # state = train_step(state, batch, train_rng)
-                if (j+1) % 1 == 0:
+                # if (j+1) % 5 == 0:
+                if (j+1) == 5:
                     print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
         
