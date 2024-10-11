@@ -240,6 +240,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
     # print(f"Intended Data type: {config.data_args['dtype']}")
     
     prev_state = state
+    prev_loss = jnp.inf
     
     # Train the model
     for epoch in range(config.num_epochs):
@@ -289,12 +290,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 break
         
         # Check for gradient explosion
-        if epoch > 1 and metrics["loss"] > 8 * metric_list[-2]["loss"]:
+        if epoch > 1 and metrics["loss"] > 8 * prev_loss:
             print(f"Loss has increased by more than an order of magnitude. Reverting.")
             state = prev_state
             continue
         else:
             prev_state = state
+            prev_loss = metrics["loss"]
         
         # Save the best model, assuming that it performs equally well on the validation set
         if best_loss*1.1 > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
