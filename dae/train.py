@@ -284,7 +284,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 break
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        # if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
             
             # Create a validation data set 
             rng, test_rng, z_rng = random.split(rng, 3)
@@ -292,7 +293,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
                 key=test_rng, 
                 n=config.batch_size
             ))
-            metrics = eval_f(state, test_batch, eval_rng)
+            metrics, _ = eval_f(state, test_batch, eval_rng)
             
             comparison_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
             
