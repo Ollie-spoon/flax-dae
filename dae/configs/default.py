@@ -93,7 +93,7 @@ def get_config():
     config.io_dim = 68
     config.batch_size = 1000
     config.epoch_size = 10000
-    config.num_epochs = 500
+    config.num_epochs = 150
     config.cycles_per_epoch = 4
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
