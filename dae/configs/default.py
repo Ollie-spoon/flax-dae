@@ -62,12 +62,12 @@ def get_config():
         # [20000, 0.00002*scale],
     ])
     config.loss_scaling = {
-        "wt": 0.00001,
+        "wt": 0.0001,
         "t": 1.0,
-        "fft_m": 0.001,
-        "fft_p": 0.001,
-        "fft_m_max": 0.0,
-        "fft_p_max": 0.0,
+        "fft_m": 1.0,
+        "fft_p": 1.0,
+        "fft_m_max": 1.0,
+        "fft_p_max": 0.01,
         "l2": 0.001,
         "kl": 0.0,
         "output_std": 0.0,
