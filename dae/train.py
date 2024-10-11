@@ -269,12 +269,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, working_dir: str):
         
         # Evaluate the model
         rng, eval_rng = random.split(rng)
-        metrics, comparison = eval_f(state, test_batch, eval_rng)
+        metrics, _ = eval_f(state, test_batch, eval_rng)
         
         metric_list.append(metrics)
         
-        # Create comparison plot
-        utils.plot_comparison(comparison, epoch+1, working_dir + 'dae/reconstruction_{}.png'.format(epoch+1))
+        # # Create comparison plot
+        # utils.plot_comparison(comparison, epoch+1, working_dir + 'dae/reconstruction_{}.png'.format(epoch+1))
 
         # Print the evaluation metrics
         if (epoch + 1) % 1 == 0:
