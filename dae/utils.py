@@ -11,6 +11,7 @@ import os
 from cr.wavelets import dwt_max_level
 from pywt import Wavelet
 import pickle
+import data_processing
 # import GPUtil
 # import psutil
 
@@ -148,6 +149,31 @@ def __convert_to_path(string):
     if isinstance(string, str):
         return string.replace('\\', '/')
     raise ValueError("Input must be a string.")
+
+def print_comparison(comparison):
+    true_params, noise_powers, prediction = comparison
+    
+    amps_true = true_params[:, 0::2]
+    taus_true = true_params[:, 1::2]
+    
+    noise_power_predicted = prediction[:, -1]
+    prediction = prediction[:, :-1]
+    taus_predicted = prediction[:, 0::2]
+    amps_predicted = prediction[:, 1::2]
+    
+    taus_predicted, amps_predicted, noise_power_predicted = data_processing.unnormalize_exp_params(taus_predicted, amps_predicted, noise_power_predicted)
+    
+    for i in range(len(true_params)):
+        print(f"Parameter comparison {i+1} " + "\{true\}:\{predicted\}:")
+        print(f"\tA1 {amps_true[i, 0]:.4f} {amps_predicted[i, 0]:.4f}")
+        print(f"\tT1 {taus_true[i, 0]:.4f} {taus_predicted[i, 0]:.4f}")
+        print(f"\tA2 {amps_true[i, 1]:.4f} {amps_predicted[i, 1]:.4f}")
+        print(f"\tT2 {taus_true[i, 1]:.4f} {taus_predicted[i, 1]:.4f}")
+        print(f"\tNoise Power {noise_powers[i]:.4f} {noise_power_predicted[i]:.4f}")
+    
+    return
+        
+
 
 # def __get_memory_size():
 #     if devices()[0].device_kind == 'gpu':

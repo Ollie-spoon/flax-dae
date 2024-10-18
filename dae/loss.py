@@ -7,6 +7,8 @@ from cr.wavelets import wavedec, waverec
 from time import time
 from typing import Dict, List
 
+import data_processing
+
 #### ~~~~ Define the loss functions ~~~~ ####
 
 # Mean Squared Error Loss
@@ -285,4 +287,57 @@ def print_metrics(metrics, pre_text=""):
     
     print(print_out)
     return
+
+
+
+# Alternate loss function using pure parameter prediction
+def create_compute_metrics_alt():
+    """
+    Creates a compute metrics function.
     
+    Returns:
+    - compute_metrics (Callable): Compute metrics function with scaled loss weights.
+    """
+    
+    
+    def compute_metrics(batch, recon_x):
+        """
+        Computes metrics with scaled loss weights.
+        
+        Args:
+        - recon_approx: Reconstructed approximation.
+        - noisy_approx: Noisy approximation.
+        - mean: Mean value.
+        - logvar: Log variance value.
+        - clean_signal: Clean signal.
+        - model_params: Model parameters.
+        
+        Returns:
+        - metrics (Dict[str, float]): Dictionary of metrics.
+        """
+        
+        # clean signal, noisy approximation coefficients, noisy signal, parameters, noise power
+        _, _, _, params, noise_power = batch
+        
+        amps = params[:, 0::2]
+        taus = params[:, 1::2]
+        
+        taus, amps, noise_power = data_processing.normalize_exp_params(taus, amps, noise_power)
+        
+        noise_power = jnp.reshape(noise_power, (-1, 1))
+        
+        target = jnp.concatenate([taus, amps, noise_power], axis=1)
+        
+        # Initialize metrics dictionary
+        metrics = {}
+        
+        # Compute losses
+        metrics["mse"] = get_mse_loss(target, recon_x).mean()*100
+        
+        # Compute total loss
+        metrics["loss"] = jnp.sum(jnp.array([value for _, value in metrics.items()]))
+        
+        return metrics
+    
+    # JIT compile compute metrics function
+    return jit(compute_metrics)

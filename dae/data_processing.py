@@ -93,3 +93,27 @@ def get_noise_std(batch, wavelet, mode, max_dwt_level):
     # Calculate the standard deviation of the difference across the batch
     noise_std = jnp.std(difference, axis=0)
     return noise_std
+
+# We want to reformat the prediction parameters so that they are roughly normalized
+@jax.jit
+def normalize_exp_params(taus, amps, noise_power):
+    # Normalize the taus
+    taus_norm = jnp.log10(taus)-1
+    # Normalize the amplitudes
+    amps_norm = amps
+    # Normalize the noise power
+    noise_power_norm = -jnp.log10(noise_power)-1
+    
+    return taus_norm, amps_norm, noise_power_norm#
+
+# We want to reformat the prediction parameters so that they are roughly normalized
+@jax.jit
+def unnormalize_exp_params(taus_norm, amps_norm, noise_power_norm):
+    # Normalize the taus
+    taus = jnp.power(10, taus_norm + 1)
+    # Normalize the amplitudes
+    amps = amps_norm
+    # Normalize the noise power
+    noise_power = jnp.power(10, -(noise_power_norm + 1))
+    
+    return taus, amps, noise_power

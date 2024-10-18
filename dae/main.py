@@ -31,7 +31,7 @@ import train
 FLAGS = flags.FLAGS
 
 # Define a new flag for the working directory
-flags.DEFINE_string('working_dir', None, 'Directory that this is currently running in. This should be the path up until the directory containing the tmp, and dae files.')
+# flags.DEFINE_string('working_dir', None, 'Directory that this is currently running in. This should be the path up until the directory containing the tmp, and dae files.')
 # Define a new flag for the configuration file
 config_flags.DEFINE_config_file(
     'config',
@@ -59,9 +59,9 @@ def main(argv):
         f'process_count: {jax.process_count()}'
     )
 
-    train.train_and_evaluate(FLAGS.config, FLAGS.working_dir)
+    train.train_and_evaluate(FLAGS.config)
 
 
 if __name__ == '__main__':
-    flags.mark_flags_as_required(['config', 'working_dir'])
+    flags.mark_flags_as_required(['config'])
     app.run(main)

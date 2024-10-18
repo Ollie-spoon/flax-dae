@@ -137,6 +137,7 @@ def denoise_bi_exponential():
     from jax.scipy.optimize import minimize
     from sklearn.cluster import HDBSCAN
     
+    
     a1 = 1.0
     tau1 = 100.0
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
@@ -145,8 +146,8 @@ def denoise_bi_exponential():
         rng, noise_key, amp_key, tau_key = random.split(rng, 4)
         noisy_signal = clean_signal + noise_scale * random.normal(noise_key, shape=t.shape)
         
-        a0 = jax.random.uniform(key4, minval=0.5, maxval=1.5, shape=(number_of_optimizations,))
-        tau0 = jax.random.uniform(key4, minval=20, maxval=180, shape=(number_of_optimizations,))
+        a0 = jax.random.uniform(amp_key, minval=0.5, maxval=1.5, shape=(number_of_optimizations,))
+        tau0 = jax.random.uniform(tau_key, minval=20, maxval=180, shape=(number_of_optimizations,))
         
         x0 = jnp.stack([a0, tau0], axis=1)
         predictions = jnp.zeros((number_of_optimizations, 2))
@@ -165,14 +166,6 @@ def denoise_bi_exponential():
         
         labels = hdbscan.labels_
         medoids = hdbscan.cluster_centers_
-        
-        # Plot the results
-        plt.scatter(predictions[:, 0], predictions[:, 1], c=labels, cmap='viridis')
-        plt.title('HDBSCAN Clustering')
-        plt.xlabel('Feature 1')
-        plt.ylabel('Feature 2')
-        plt.legend()
-        plt.show()
         
         # Now we're going to take the medoid of the medoids
         final_medoid = find_medoid(medoids)

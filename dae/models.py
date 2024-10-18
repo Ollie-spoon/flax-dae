@@ -149,7 +149,7 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
     #     io_dim=io_dim,
     #     dtype=dtype,
     # )
-    return CNN(
+    return CNN_pure(
         kernel_size=5,
         io_dim=io_dim,
         features=hidden,
@@ -165,7 +165,7 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
 
 
 class CNN(nn.Module):
-    """Convolutional model, currently an autoencoder."""
+    """Convolutional model, currently an autoencoder (ish)."""
     
     kernel_size: int
     io_dim: int
@@ -406,3 +406,101 @@ class UNetUpLayer(nn.Module):
         x = ConvolutionalBlock(self.features, self.kernel_size, self.padding, self.deterministic)(x)
         
         return x
+    
+class Flatten(nn.Module):
+    """Flatten layer."""
+    
+    activation: callable = nn.gelu
+    
+    @nn.compact
+    def __call__(self, x):
+        x = nn.Conv(features=1, kernel_size=(1), padding='VALID')(x)
+        x = self.activation(x)
+        x = jnp.reshape(x, (x.shape[0], x.shape[1]))
+        return x
+    
+
+class CNN_pure(nn.Module):
+    """Convolutional model, currently an autoencoder."""
+    
+    kernel_size: int
+    io_dim: int
+    features: int
+    dropout_rate: float
+    noise_std: jnp.array
+    
+    @nn.compact
+    def __call__(self, x, z_rng, deterministic: bool):
+        assert self.kernel_size % 2 == 1, "Kernel size must be odd."
+        
+        x = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
+        
+        # Starting size = 1120
+        # Ending size = 68
+        
+        # (1120 - (4*2))/2 = 556
+        # (556 - (4*2))/2 = 274
+        # (274 - (4*2))/2 = 133
+        # (133 - (4*2))/2 = 64
+        # (64 - (4*2))/2 = 28
+        
+        # jax.debug.print("x0: {}", x.shape)
+        
+        # Initial convolutional block (1120 -> 1112)
+        x = ConvolutionalBlock(self.features, self.kernel_size, 'VALID', deterministic)(x)
+        x = ConvolutionalBlock(self.features, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x1: {}", x.shape)
+        
+        # Layer 1 (1112 -> 556 -> 548)
+        x = UNetDownLayer(self.features*2, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x2: {}", x.shape)
+        
+        # Layer 2 (548 -> 274 -> 266)
+        x = UNetDownLayer(self.features*4, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x3: {}", x.shape)
+        
+        # Layer 3 (266 -> 133 -> 125)
+        x = UNetDownLayer(self.features*8, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x4: {}", x.shape)
+        
+        # Layer 4 (125 -> 62 -> 54)
+        x = UNetDownLayer(self.features*16, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x5: {}", x.shape)
+        
+        # Layer 5 (54 -> 27 -> 19)
+        x = UNetDownLayer(self.features*32, self.kernel_size, 'VALID', deterministic)(x)
+        
+        # jax.debug.print("x6: {}", x.shape)
+        
+        # Flatten (19 -> 19)
+        x = Flatten(nn.gelu)(x)
+        
+        # jax.debug.print("x8: {}", x.shape)
+        
+        # MLP layer (19 -> 100)
+        x = nn.Dense(features=100)(x)
+        x = nn.gelu(x)
+        x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+        
+        # Output layer (19 -> 5)
+        mean_tau = nn.Dense(features=2)(x)
+        logvar_tau = nn.Dense(features=2)(x)
+        
+        mean_amp = nn.Dense(features=2)(x)
+        logvar_amp = nn.Dense(features=2)(x)
+        
+        tau = jnp.where(deterministic, mean_tau, reparameterize_norm(z_rng, mean_tau, logvar_tau))
+        # tau = jnp.power(10, tau+1)
+        
+        amp = jnp.where(deterministic, mean_amp, reparameterize_norm(z_rng, mean_amp, logvar_amp))
+        
+        noise_power = nn.Dense(features=1)(x)
+        # noise_power = jnp.power(10, -(noise_power+1))
+
+        return jnp.concatenate([tau, amp, noise_power], axis=-1)
+

@@ -21,7 +21,7 @@ def create_generate_single_data(t, wavelet, mode, max_dwt_level):
         # Perform wavelet decomposition
         noisy_coeffs = wavelet_approx(noisy_signal)
 
-        return clean_signal, noisy_coeffs, noisy_signal
+        return clean_signal, noisy_coeffs, noisy_signal, params, noise_power
     
     return generate_single_data
 
@@ -56,28 +56,28 @@ def create_generate_basic_data(
         # Generate random tau values for all iterations (inside JIT context)
         key, key_amp, key_ampsum, key_tau, key_noise = jax.random.split(key, 5)
         
-        # amplitudes = jax.random.dirichlet(
-        #     key=key_amp,
-        #     alpha=jnp.ones(params["decay_count"]),
-        #     shape=(iterations,),
-        #     dtype=dtype,
-        # )
+        amplitudes = jax.random.dirichlet(
+            key=key_amp,
+            alpha=jnp.ones(params["decay_count"]),
+            shape=(iterations,),
+            dtype=dtype,
+        )
         
-        amplitudes = jnp.array([
-            jnp.ones(iterations)*0.25, 
-            jnp.ones(iterations)*0.75, 
-        ], dtype=dtype).T
+        # amplitudes = jnp.array([
+        #     jnp.ones(iterations)*0.25, 
+        #     jnp.ones(iterations)*0.75, 
+        # ], dtype=dtype).T
         
         # # Generate random amplitude sums for each iteration
-        # amp_sum = jax.random.gamma(
-        #     key=key_ampsum, 
-        #     a=2.0,
-        #     shape=(iterations,), 
-        #     dtype=dtype,
-        # ) / 20.0 + 0.95
+        amp_sum = jax.random.gamma(
+            key=key_ampsum, 
+            a=2.0,
+            shape=(iterations,), 
+            dtype=dtype,
+        ) / 20.0 + 0.95
         
-        # # Combine the amplitudes and amplitude sums
-        # amplitudes = amplitudes * amp_sum[:, None]
+        # Combine the amplitudes and amplitude sums
+        amplitudes = amplitudes * amp_sum[:, None]
         
         decay_constants = jax.random.uniform(
             key=key_tau,
@@ -87,21 +87,24 @@ def create_generate_basic_data(
             dtype=dtype,
         )
         
+        # sort the decay constants in ascending order
+        decay_constants = jnp.sort(decay_constants, axis=1)
+        
         param_array = jnp.empty((iterations, 2*params["decay_count"]), dtype=dtype)
         param_array = param_array.at[:, ::2].set(amplitudes)
         param_array = param_array.at[:, 1::2].set(decay_constants)
         
         # jax.debug.print("param_array.shape: {}", param_array.shape)
         
-        # SNR_array = (jax.random.normal(
-        #     key=key_noise, 
-        #     shape=(iterations,), 
-        #     dtype=dtype,
-        # ) / 10.0 + 1) * SNR
+        SNR_array = (jax.random.normal(
+            key=key_noise, 
+            shape=(iterations,), 
+            dtype=dtype,
+        ) / 5.0 + 1) * SNR
         
-        # noise_power_array = amp_sum / SNR_array
+        noise_power_array = amp_sum / SNR_array
         # noise_power_array = 1.0 / SNR_array
-        noise_power_array = jnp.ones(iterations) / SNR
+        # noise_power_array = jnp.ones(iterations) / SNR
         
         keys = jax.random.split(key, iterations)
         

@@ -8,16 +8,17 @@ from typing import Union
 import generate_data
 
 def create_data_generator(kwargs):
-    _generate_data = generate_data.create_generate_basic_data(**kwargs)
+    generate_dataset = generate_data.create_generate_basic_data(**kwargs)
 
-    def data_generator(key: jnp.ndarray, n: int, batch_size: Union[int, None] = None):
-        # Generate the full dataset in one go
-        rng, key = random.split(key)
-        data = _generate_data(key, n)
+    def data_generator(
+        key: jnp.ndarray, 
+        n: int, 
+        batch_size: Union[int, None] = None,
+        ):
         
-        clean_signal = data[0]  # Noiseless version in the time domain
-        noisy_approx = data[1]  # Noisy version of the approximation coefficient
-        noisy_signal = data[2]  # Noisy version in the time domain
+        # Generate the full dataset in one go
+        rng, key1, key2 = random.split(key, 3)
+        data = generate_dataset(key1, n)
         
         if batch_size is None:
             batch_size = n  # Default batch size is all data
@@ -28,30 +29,23 @@ def create_data_generator(kwargs):
 
         # This function shuffles and reshapes the data
         @jax.jit
-        def shuffle_data(key, clean_signal, noisy_approx):
+        def shuffle_data(key, data):
             indices = random.permutation(key, n)  # JAX-based shuffling
-            shuffled_clean_signal = clean_signal[indices]
-            shuffled_noisy_approx = noisy_approx[indices]
-            shuffled_noisy_signal = noisy_signal[indices]
-
-            # Reshape into batches
-            clean_signal_batched = shuffled_clean_signal.reshape((num_batches, batch_size, *clean_signal.shape[1:]))
-            noisy_approx_batched = shuffled_noisy_approx.reshape((num_batches, batch_size, *noisy_approx.shape[1:]))
-            noisy_signal_batched = shuffled_noisy_signal.reshape((num_batches, batch_size, *noisy_signal.shape[1:]))
-            return clean_signal_batched, noisy_approx_batched, noisy_signal_batched
+            output = tuple(data_point[indices].reshape((num_batches, batch_size, *data_point.shape[1:])) for data_point in data)
+            return output
 
         # Define a looped batch iterator that reshuffles after each pass
         def batch_iterator(rng):
             while True:
                 # Shuffle the entire dataset using JAX's random module
                 rng, key = random.split(rng)
-                clean_signal_batched, noisy_approx_batched, noisy_signal_batched = shuffle_data(key, clean_signal, noisy_approx)
+                data_batched = shuffle_data(key, data)
                 
                 # Yield each batch one by one in sequence
                 for i in range(num_batches):
-                    yield clean_signal_batched[i], noisy_approx_batched[i], noisy_signal_batched[i]
+                    yield tuple(data_point[i] for data_point in data_batched)
 
-        return batch_iterator(rng)
+        return batch_iterator(key2)
 
     return data_generator
 

@@ -82,7 +82,7 @@ def get_config():
         },
         "t_max": 400, 
         "t_len": 1120, 
-        "SNR": 10,
+        "SNR": 100,
         "wavelet": "coif6", 
         "mode": "zero",
         "dtype": float32,
@@ -94,7 +94,8 @@ def get_config():
     config.batch_size = 1000
     config.epoch_size = 10000
     config.num_epochs = 150
-    config.cycles_per_epoch = 4
+    config.cycles_per_epoch = 1
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
+    config.working_dir = ""
     return config
