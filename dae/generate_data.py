@@ -1,14 +1,14 @@
 import jax.numpy as jnp
 import jax
 from typing import Union
-from data_processing import create_multi_exponential_decay, create_wavelet_approx
+import data_processing
 
 # JIT compile and parallelize single data generation
 def create_generate_single_data(t, wavelet, mode, max_dwt_level):
     
-    multi_exponential_decay = create_multi_exponential_decay(t)
+    multi_exponential_decay = data_processing.create_multi_exponential_decay(t)
     # wavelet_decomposition = create_wavelet_decomposition(wavelet, mode)
-    wavelet_approx = create_wavelet_approx(wavelet, mode, max_dwt_level)
+    # wavelet_approx = data_processing.create_wavelet_approx(wavelet, mode, max_dwt_level)
     
     # Efficient noise generation inside the JIT function
     @jax.jit
@@ -19,7 +19,8 @@ def create_generate_single_data(t, wavelet, mode, max_dwt_level):
         # noisy_signal = clean_signal + noise_power * jax.random.cauchy(key, shape=t.shape)
 
         # Perform wavelet decomposition
-        noisy_coeffs = wavelet_approx(noisy_signal)
+        # noisy_coeffs = wavelet_approx(noisy_signal)
+        noisy_coeffs = jnp.array([jnp.nan])
 
         return clean_signal, noisy_coeffs, noisy_signal, params, noise_power
     
@@ -90,9 +91,7 @@ def create_generate_basic_data(
         # sort the decay constants in ascending order
         decay_constants = jnp.sort(decay_constants, axis=1)
         
-        param_array = jnp.empty((iterations, 2*params["decay_count"]), dtype=dtype)
-        param_array = param_array.at[:, ::2].set(amplitudes)
-        param_array = param_array.at[:, 1::2].set(decay_constants)
+        param_array = data_processing.format_params(amplitudes, decay_constants)
         
         # jax.debug.print("param_array.shape: {}", param_array.shape)
         

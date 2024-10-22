@@ -22,7 +22,7 @@ def get_config():
         
         
         ## All of the below lr are for adam and are waaaay too high for sgd
-        [1, 0.01],
+        [1, 0.00015],
         # [5, 0.005],
         # [9, 0.002],
         # [13, 0.001],
@@ -62,13 +62,13 @@ def get_config():
         # [20000, 0.00002*scale],
     ])
     config.loss_scaling = {
-        "wt": 0.0001,
+        "wt": 0.0,
         "t": 1.0,
         "fft_m": 1.0,
         "fft_p": 1.0,
-        "fft_m_max": 1.0,
-        "fft_p_max": 0.01,
-        "l2": 0.001,
+        "fft_m_max": 0.0,
+        "fft_p_max": 0.0,
+        "l2": 0.1,
         "kl": 0.0,
         "output_std": 0.0,
     }
@@ -81,18 +81,18 @@ def get_config():
             "decay_count": 2,
         },
         "t_max": 400, 
-        "t_len": 1120, 
+        "t_len": 672, 
         "SNR": 100,
         "wavelet": "coif6", 
         "mode": "zero",
         "dtype": float32,
     }
     config.latents = 4
-    config.hidden = 20
+    config.hidden = 12
     config.dropout_rate = 0.1
-    config.io_dim = 68
-    config.batch_size = 1000
-    config.epoch_size = 10000
+    config.io_dim = 672
+    config.batch_size = 500
+    config.epoch_size = 5000
     config.num_epochs = 150
     config.cycles_per_epoch = 1
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'

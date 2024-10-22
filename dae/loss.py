@@ -184,7 +184,9 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         
         # Perform noise injection
         
-        clean_approx, injected_noisy, injected_denoised  = noise_injection(clean_signal, noisy_approx, recon_approx)
+        # clean_approx, injected_noisy, injected_denoised  = noise_injection(clean_signal, noisy_approx, recon_approx)
+        clean_approx, injected_noisy, injected_denoised = None, None, recon_approx
+        
         
         # Initialize metrics dictionary
         metrics = {}
@@ -237,7 +239,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     }
     
     # Extract data from example batch
-    clean_signal, noisy_approx, _ = example_batch
+    clean_signal, _, noisy_signal, _, _ = example_batch
     
     # Compute example metrics using baseline weights
     noise_injection = create_noise_injection(wavelet, mode)
@@ -255,10 +257,10 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         print_metrics(loss_scaling, pre_text="Loss values for completely random data: (beating these values is the bare minimum goal)\n")
         
         # Compute example metrics for each loss type
-        example_metrics = compute_metrics(clean_signal, noisy_approx, noisy_approx, jnp.array([0.5, -0.5]), None, None, None)
+        example_metrics = compute_metrics(clean_signal, noisy_signal, noisy_signal, jnp.array([0.5, -0.5]), None, None, None)
         
         loss_scaling.update(scale_agnostic_scaling)
-       
+    
     
     # Update weights to be scaled
     print(f"loss_scaling: {loss_scaling}")
@@ -319,8 +321,7 @@ def create_compute_metrics_alt():
         # clean signal, noisy approximation coefficients, noisy signal, parameters, noise power
         _, _, _, params, noise_power = batch
         
-        amps = params[:, 0::2]
-        taus = params[:, 1::2]
+        amps, taus = data_processing.extract_params(params)
         
         taus, amps, noise_power = data_processing.normalize_exp_params(taus, amps, noise_power)
         

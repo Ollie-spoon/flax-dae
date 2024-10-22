@@ -4,7 +4,10 @@ import jax
 # jax.config.update('jax_enable_x64', True)
 import jax.numpy as jnp
 from flax import linen as nn
-from jax import jit, random
+from jax import jit, vmap, random
+import chex
+
+import data_processing
 
 
 class ResidualBlock(nn.Module):
@@ -133,12 +136,17 @@ def reparameterize_norm(rng, mean, logvar):
     eps = random.normal(rng, logvar.shape)
     return mean + eps * std
 
-# @jit
-# def reparameterize_truncated_normal(self, rng, mean, logvar):
-#     # a and b are the lower and upper bounds of the truncated normal distribution
-#     std = jnp.exp(0.5 * logvar)
-#     eps = random.truncated_normal(key=rng, lower=0, upper=jnp.inf, shape=logvar.shape, dtype=self.dtype)
-#     return mean + eps * std
+@jit
+def reparameterize_truncated_normal(rng, mean, logvar):
+    # a and b are the lower and upper bounds of the truncated normal distribution
+    std = jnp.sqrt(logvar)
+    eps = random.truncated_normal(key=rng, lower=0, upper=jnp.inf, shape=logvar.shape)
+    return mean + eps * std
+
+@jit
+def reparameterize_mean(mean):
+    # where the mean array is less than 0, return 0, else return the mean
+    return jnp.at[mean < 0].set(0)
 
 
 def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
@@ -149,19 +157,19 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
     #     io_dim=io_dim,
     #     dtype=dtype,
     # )
-    return CNN_pure(
-        kernel_size=5,
-        io_dim=io_dim,
-        features=hidden,
-        dropout_rate=dropout_rate,
-        noise_std=noise_std,
-    )
-    # return UNet(
-    #     kernel_size=7,
+    # return CNN_pure(
+    #     kernel_size=5,
     #     io_dim=io_dim,
     #     features=hidden,
-    #     padding='SAME',
+    #     dropout_rate=dropout_rate,
+    #     noise_std=noise_std,
     # )
+    return UNet(
+        kernel_size=7,
+        io_dim=io_dim,
+        features=hidden,
+        padding='SAME',
+    )
 
 
 class CNN(nn.Module):
@@ -301,7 +309,8 @@ class UNet(nn.Module):
     
     @nn.compact
     def __call__(self, x, z_rng, deterministic: bool):
-        assert self.kernel_size % 2 == 1, "Kernel size must be odd."
+        # assert self.kernel_size % 2 == 1, "Kernel size must be odd."
+        
         
         x0 = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
         
@@ -324,37 +333,64 @@ class UNet(nn.Module):
         
         # jax.debug.print("x2: {}", x2.shape)
         
+        # Layer 3 (io_dim/2 -> io_dim/4)
+        x3 = UNetDownLayer(self.features*8, self.kernel_size, self.padding, deterministic)(x2)
+        
+        # jax.debug.print("x3: {}", x3.shape)
+        
+        # Layer 4 (io_dim/4 -> io_dim/8)
+        x4 = UNetDownLayer(self.features*12, self.kernel_size, self.padding, deterministic)(x3)
+        
+        # jax.debug.print("x4: {}", x4.shape)
         # Expanding path (Decoder)
         
-        # Upsample 1 (io_dim/4 -> io_dim/2)
+        # Upsample 1 (io_dim/8 -> io_dim/4)
+        x3 = UNetUpLayer(self.features*8, self.kernel_size, self.padding, deterministic)(x4, x3)
+        
+        # jax.debug.print("x3: {}", x3.shape)
+        
+        # Upsample 2 (io_dim/4 -> io_dim/2)
+        x2 = UNetUpLayer(self.features*4, self.kernel_size, self.padding, deterministic)(x3, x2)
+        
+        # jax.debug.print("x2: {}", x2.shape)
+        
+        # Upsample 3 (io_dim/4 -> io_dim/2)
         x1 = UNetUpLayer(self.features*2, self.kernel_size, self.padding, deterministic)(x2, x1)
         
         # jax.debug.print("x1: {}", x1.shape)
         
-        # Upsample 2 (io_dim/2 -> io_dim)
+        # Upsample 4 (io_dim/2 -> io_dim)
         x0 = UNetUpLayer(self.features, self.kernel_size, self.padding, deterministic)(x1, x0)
         
         # jax.debug.print("x0: {}", x0.shape)
         
         # Final output layer
-        x0 = nn.Conv(features=1, kernel_size=(1, 1), padding='VALID')(x0)  # Reduce to single output channel
+        x0 = nn.Conv(features=1, kernel_size=1, padding='VALID')(x0)  # Reduce to single output channel
+        x0 = nn.gelu(x0)
         
         # jax.debug.print("output: {}", x0.shape)
         
         x0 = jnp.reshape(x0, (x0.shape[0], x0.shape[1]))
         
-        # x0 = nn.Dense(features=self.io_dim)(x0)
-        # x0 = nn.gelu(x0)
-        # # x_ = nn.Dropout(rate=0.2)(x_, deterministic=deterministic)
+        # jax.debug.print("after reshaping: {}", x0.shape)
         
+        x0 = nn.Dense(features=self.io_dim*2)(x0)
+        x0 = nn.gelu(x0)
+        x0 = nn.Dropout(rate=0.2)(x0, deterministic=deterministic)
+        
+        # # jax.debug.print("After MLP-up: {}", x0.shape)
+        
+        x0 = nn.Dense(features=self.io_dim)(x0)
+        
+        # jax.debug.print("After MLP-down: {}", x0.shape)
 
-        x_sign = nn.Dense(features=self.io_dim)(x0)
-        x_power = nn.Dense(features=self.io_dim)(x0)
+        # x_sign = nn.Dense(features=self.io_dim)(x0)
+        # x_power = nn.Dense(features=self.io_dim)(x0)
         
-        x = reparameterize_dx(z_rng, x_sign, x_power, deterministic)
+        # x = reparameterize_dx(z_rng, x_sign, x_power, deterministic)
         
         
-        return x #+ x
+        return x0 # + x
 
 class ConvolutionalBlock(nn.Module):
     
@@ -367,12 +403,16 @@ class ConvolutionalBlock(nn.Module):
     def __call__(self, x):
         x = nn.Conv(features=self.features, kernel_size=(self.kernel_size), padding=self.padding)(x)
         x = nn.GroupNorm(group_size=4, num_groups=None)(x)
+        # x = nn.LayerNorm()(x)
         x = nn.gelu(x)
         
         return x
 
 class UNetDownLayer(nn.Module):
-    """U-Net down layer."""
+    """U-Net down layer.
+    
+    Starts with a max pooling layer, then two convolutional blocks.
+    """
     
     features: int
     kernel_size: int
@@ -381,7 +421,8 @@ class UNetDownLayer(nn.Module):
     
     @nn.compact
     def __call__(self, x):
-        x = nn.pooling.max_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        # x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
+        x = nn.Conv(features=x.shape[-1], kernel_size=2, strides=2, feature_group_count=x.shape[-1], padding=self.padding)(x)
         
         x = ConvolutionalBlock(self.features, self.kernel_size, self.padding, self.deterministic)(x)
         x = ConvolutionalBlock(self.features, self.kernel_size, self.padding, self.deterministic)(x)
@@ -398,7 +439,13 @@ class UNetUpLayer(nn.Module):
     
     @nn.compact
     def __call__(self, x, x_skip):
-        x = nn.ConvTranspose(features=self.features, kernel_size=(self.kernel_size), strides=(2), padding='SAME')(x)
+        x = nn.ConvTranspose(features=self.features, kernel_size=2, strides=2, padding='VALID')(x)
+        
+        # print(x.shape)
+        # print(x_skip.shape)
+        # x = jnp.where(x.shape[1] == x_skip.shape[1], x, x[:, :-1, :]) # Adjust for odd signal length
+        # print(x.shape)
+        # print(x_skip.shape)
         
         x = jnp.concatenate([x_skip, x], axis=-1)  # Skip connection
         
@@ -414,7 +461,7 @@ class Flatten(nn.Module):
     
     @nn.compact
     def __call__(self, x):
-        x = nn.Conv(features=1, kernel_size=(1), padding='VALID')(x)
+        x = nn.Conv(features=1, kernel_size=(1, 1), padding='VALID')(x)
         x = self.activation(x)
         x = jnp.reshape(x, (x.shape[0], x.shape[1]))
         return x
@@ -434,6 +481,9 @@ class CNN_pure(nn.Module):
         assert self.kernel_size % 2 == 1, "Kernel size must be odd."
         
         x = jnp.reshape(x, (x.shape[0], x.shape[1], 1))
+        
+        # convert from x to dx
+        x = -jnp.diff(x, axis=1)
         
         # Starting size = 1120
         # Ending size = 68
@@ -473,7 +523,7 @@ class CNN_pure(nn.Module):
         # jax.debug.print("x5: {}", x.shape)
         
         # Layer 5 (54 -> 27 -> 19)
-        x = UNetDownLayer(self.features*32, self.kernel_size, 'VALID', deterministic)(x)
+        # x = UNetDownLayer(self.features*32, self.kernel_size, 'VALID', deterministic)(x)
         
         # jax.debug.print("x6: {}", x.shape)
         
@@ -487,20 +537,26 @@ class CNN_pure(nn.Module):
         x = nn.gelu(x)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
         
-        # Output layer (19 -> 5)
-        mean_tau = nn.Dense(features=2)(x)
-        logvar_tau = nn.Dense(features=2)(x)
-        
+        # Output layer (100 -> 4)
         mean_amp = nn.Dense(features=2)(x)
         logvar_amp = nn.Dense(features=2)(x)
         
-        tau = jnp.where(deterministic, mean_tau, reparameterize_norm(z_rng, mean_tau, logvar_tau))
-        # tau = jnp.power(10, tau+1)
+        amp = reparameterize_truncated_normal(
+            z_rng, 
+            mean_amp, 
+            jnp.where(deterministic, jnp.zeros_like(logvar_amp), logvar_amp),
+        )
         
-        amp = jnp.where(deterministic, mean_amp, reparameterize_norm(z_rng, mean_amp, logvar_amp))
+        mean_tau = nn.Dense(features=2)(x)
+        logvar_tau = nn.Dense(features=2)(x)
         
-        noise_power = nn.Dense(features=1)(x)
-        # noise_power = jnp.power(10, -(noise_power+1))
+        tau = reparameterize_truncated_normal(
+            z_rng, 
+            mean_tau, 
+            jnp.where(deterministic, jnp.zeros_like(logvar_tau), logvar_tau),
+        )
+        tau = jnp.power(10, tau)
+        
+        params = data_processing.format_params(amp, tau)
 
-        return jnp.concatenate([tau, amp, noise_power], axis=-1)
-
+        return params 

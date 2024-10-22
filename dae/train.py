@@ -44,7 +44,8 @@ def create_learning_rate_scheduler(config):
     return learning_rate_schedule
 
 # Define the training step
-def create_train_step(get_metrics, model_args):
+def create_train_step(get_metrics, model_args, gen_decays):
+    
     @jax.jit
     def train_step(state, batch, rng):
         clean_signal, noisy_approx, noisy_signal, true_params, noise_powers = batch
@@ -54,7 +55,11 @@ def create_train_step(get_metrics, model_args):
         def loss_fn(params):
             # Apply the model with mutable batch_stats
             # (prediction, mean, logvar), new_state = models.model(
-            prediction = models.model(
+            
+            x, x0 = data_processing.normalize_signal(noisy_signal)
+            dx = data_processing.dx_from_x(x)
+            
+            prediction_dx = models.model(
                 hidden=model_args["hidden"],
                 latents=model_args["latents"],
                 dropout_rate=model_args["dropout_rate"],
@@ -62,22 +67,31 @@ def create_train_step(get_metrics, model_args):
                 noise_std=model_args["noise_std"],
             ).apply(
                 {'params': params},# 'batch_stats': batch_stats},
-                x=noisy_signal,
+                x=dx,
                 z_rng=z_rng,
                 deterministic=False,
                 # mutable=["batch_stats"],
                 rngs={'dropout': dropout_rng},
             )
             
+            prediction = data_processing.x_from_dx(prediction_dx)
+            prediction = data_processing.unnormalize_signal(prediction, x0)
+            
+            # prediction_params = data_processing.reformat_prediction(prediction)
+            # prediction_signal = gen_decays(prediction)
+            
             # jax.debug.print("prediction shape: {}", len(prediction))
             # jax.debug.print("prediction shape: {}", prediction.shape)
             # jax.debug.print("prediction example: {}", prediction[0])
+            
+            # jax.debug.print("prediction.shape: {}", prediction.shape)
+            # jax.debug.print("clean_signal.shape: {}", clean_signal.shape)
 
             # Primary loss function
-            # loss = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)["loss"]
+            loss = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)["loss"]
             
             # Alternate loss function using pure parameter prediction
-            loss = get_metrics(batch, prediction)["loss"]
+            # loss = get_metrics(batch, prediction)["loss"]
             return loss
 
         # Get the current batch_stats from the state
@@ -92,7 +106,8 @@ def create_train_step(get_metrics, model_args):
     return train_step
 
 
-def create_eval_f(get_metrics, model_args):
+def create_eval_f(get_metrics, model_args, gen_decays):
+    
     @jax.jit
     def eval_f(state, batch, z_rng):
         
@@ -117,9 +132,13 @@ def create_eval_f(get_metrics, model_args):
             # mutable=False  # No need to update batch_stats during evaluation
         )
         
+        prediction_params = data_processing.reformat_prediction(prediction)
+        predicted_decays = gen_decays(prediction_params)
+        
+        
         # Extract four predictions to produce a comparison plot
-        # comparison = (clean_signal[0], noisy_approx[0], noisy_signal[0], prediction[0])
-        comparison = (true_params[:4], noise_powers[:4], prediction[:4])
+        comparison = (clean_signal[0], noisy_approx[0], noisy_signal[0], predicted_decays[0])
+        # comparison = (true_params[:4], noise_powers[:4], prediction[:4])
         
         # std_dx = prediction
         # prediction = noisy_approx + prediction * model_args["noise_std"]
@@ -127,12 +146,15 @@ def create_eval_f(get_metrics, model_args):
         # jax.debug.print("sdt_dx example: {}", std_dx[0])
         # jax.debug.print("sdt_dx example mean: {}", std_dx.mean(axis=0).mean())
         # jax.debug.print("sdt_dx example std: {}", std_dx.std(axis=0).mean())
+        
+        # jax.debug.print("prediction.shape: {}", prediction.shape)
+        # jax.debug.print("clean_signal.shape: {}", clean_signal.shape)
 
         # Primary loss function
-        # metrics = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)
+        metrics = get_metrics(clean_signal, noisy_approx, predicted_decays, None, None, None, params)
         
         # Alternate loss function using pure parameter prediction
-        metrics = get_metrics(batch, prediction)
+        # metrics = get_metrics(batch, prediction)
         return metrics, comparison
 
     return eval_f
@@ -144,7 +166,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     # Set up the random number generators
     # rng is the random number generator and therefore never passed to the model
     time_keeping = time()
-    rng = random.key(2000)
+    rng = random.key(2024)
     rng, init_rng, example_rng, z_rng, io_rng  = random.split(rng, 5)
     
     # Generate extract the input/output dimensions and maximum number of 
@@ -152,21 +174,21 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     io_dim, max_dwt_level = utils.get_approx_length(config.data_args["t_len"], config.data_args["wavelet"])
     logging.info(f"io_dim: {io_dim}")
     if io_dim != config.io_dim:
-        logging.info(f"Warning: io_dim ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
+        logging.info(f"Warning: approximation constant length ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
     
     # Update the config with the correct io_dim and max_dwt_level
     with config.unlocked():
-        config.io_dim = io_dim
+        # config.io_dim = io_dim
         config.data_args["max_dwt_level"] = max_dwt_level
     
     # Create the data generator
     data_generator = input_pipeline.create_data_generator(config.data_args)
     
-    # # Use the data generateor to create an example batch so that losses can be 
-    # # meaningfully normalized to the noisy data
-    # example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
-    # # get_metrics = loss.create_compute_metrics(config.loss_scaling, example_batch, config.data_args["wavelet"], config.data_args["mode"])
-    get_metrics = loss.create_compute_metrics_alt()
+    # Use the data generateor to create an example batch so that losses can be 
+    # meaningfully normalized to the noisy data
+    example_batch = next(data_generator(key=example_rng, n=config.epoch_size))
+    get_metrics = loss.create_compute_metrics(config.loss_scaling, example_batch, config.data_args["wavelet"], config.data_args["mode"])
+    # get_metrics = loss.create_compute_metrics_alt()
     
     # noise_std = data_processing.get_noise_std(example_batch, config.data_args["wavelet"], config.data_args["mode"], max_dwt_level)
 
@@ -185,9 +207,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     # metrics = get_metrics(example_batch[0], example_batch[1], example_batch[1], None, None, state.params)
     # loss.print_metrics(metrics, "Example batch metrics: ")
     
+    # Create an exponential decay generation function
+    multi_exponential_decay_generator = jax.vmap(data_processing.create_multi_exponential_decay(
+        jnp.linspace(
+            start=0,
+            stop=config.data_args["t_max"],
+            num=config.data_args["t_len"],
+            dtype=config.data_args["dtype"],
+        )
+    ))
+    
     # Create the training step and evaluation function
-    train_step = create_train_step(get_metrics, model_args)
-    eval_f = create_eval_f(get_metrics, model_args)
+    train_step = create_train_step(get_metrics, model_args, multi_exponential_decay_generator)
+    eval_f = create_eval_f(get_metrics, model_args, multi_exponential_decay_generator)
 
     metric_list = []
     best_loss = jnp.inf
@@ -199,7 +231,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         f"config.data_args: {config.data_args}\n"
     )
     # Clear memory
-    # del example_batch, time_keeping, init_rng, example_rng, z_rng, io_rng
+    del example_batch, multi_exponential_decay_generator
     del time_keeping, init_rng, example_rng, z_rng, io_rng
     
     # We want to verify that all of the data has the jnp.float64 type
@@ -247,7 +279,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         
         # # Create comparison plot
         # utils.plot_comparison(comparison, epoch+1, config.working_dir + 'dae/reconstruction_{}.png'.format(epoch+1))
-        utils.print_comparison(comparison)
+        # utils.print_comparison(comparison)
         
         
         # Print the evaluation metrics and catch NaNs
@@ -315,6 +347,7 @@ def initialize_model(
             apply_fn=models.model(**model_args).apply,
             params=params,
             tx=optax.adam(create_learning_rate_scheduler(config)),
+            # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
             opt_state=opt_state,  # Set the optimizer state
         )
         
@@ -342,12 +375,14 @@ def initialize_model(
         state = CustomTrainState.create(
             apply_fn=models.model(**model_args).apply,
             params=params,
-            tx=optax.adam(learning_rate=0.01),
+            # tx=optax.adam(learning_rate=0.01),
+            tx=optax.adam(create_learning_rate_scheduler(config)),
+            # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
+            # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
             # tx=optax.chain(
             #     optax.clip_by_global_norm(10.0),
             #     optax.adam(create_learning_rate_scheduler(config)),
             # )
-            # tx=optax.sgd(create_learning_rate_scheduler(config), momentum=0.95, nesterov=True),
             # batch_stats=batch_stats,  # Include batch_stats in the state
         )
         
