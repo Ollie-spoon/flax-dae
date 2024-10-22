@@ -116,9 +116,12 @@ def create_eval_f(get_metrics, model_args, gen_decays):
         params = state.params
         clean_signal, noisy_approx, noisy_signal, true_params, noise_powers = batch
         
+        x, x0 = data_processing.normalize_signal(noisy_signal)
+        dx = data_processing.dx_from_x(x)
+        
         # Apply the model in evaluation mode
         # prediction, mean, logvar = models.model(
-        prediction = models.model(
+        prediction_dx = models.model(
             hidden=model_args["hidden"],
             latents=model_args["latents"],
             dropout_rate=model_args["dropout_rate"],
@@ -126,18 +129,21 @@ def create_eval_f(get_metrics, model_args, gen_decays):
             noise_std=model_args["noise_std"],
         ).apply(
             {'params': params}, #'batch_stats': batch_stats},
-            x=noisy_signal,
+            x=dx,
             z_rng=z_rng,
             deterministic=True,
             # mutable=False  # No need to update batch_stats during evaluation
         )
         
-        prediction_params = data_processing.reformat_prediction(prediction)
-        predicted_decays = gen_decays(prediction_params)
+        # prediction_params = data_processing.reformat_prediction(prediction)
+        # predicted_decays = gen_decays(prediction_params)
+        
+        prediction = data_processing.x_from_dx(prediction_dx)
+        prediction = data_processing.unnormalize_signal(prediction, x0)
         
         
         # Extract four predictions to produce a comparison plot
-        comparison = (clean_signal[0], noisy_approx[0], noisy_signal[0], predicted_decays[0])
+        comparison = (clean_signal[0], noisy_approx[0], noisy_signal[0], prediction[0])
         # comparison = (true_params[:4], noise_powers[:4], prediction[:4])
         
         # std_dx = prediction
@@ -151,7 +157,7 @@ def create_eval_f(get_metrics, model_args, gen_decays):
         # jax.debug.print("clean_signal.shape: {}", clean_signal.shape)
 
         # Primary loss function
-        metrics = get_metrics(clean_signal, noisy_approx, predicted_decays, None, None, None, params)
+        metrics = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)
         
         # Alternate loss function using pure parameter prediction
         # metrics = get_metrics(batch, prediction)
