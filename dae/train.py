@@ -240,6 +240,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     prev_state = state
     prev_loss = jnp.inf
     
+    batches_per_cycle = config.epoch_size // config.batch_size
+    
     # Train the model
     for epoch in range(config.num_epochs):
         
@@ -261,13 +263,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         
         # Train the model for one epoch, cycling through the batch data multiple times
         for i in range(config.cycles_per_epoch):
-            for j in range(config.epoch_size//config.batch_size):
+            for j in range(batches_per_cycle):
                 batch = next(train_ds)
                 rng, train_rng = random.split(rng)
                 state, loss_ = train_step(state, batch, train_rng)
                 # state = train_step(state, batch, train_rng)
-                if (j+1) % 1 == 0:
-                # if (j+1) == 5:
+                # if (j+1) % 1 == 0:
+                if (j+1) == batches_per_cycle:
                     print("loss{" + f"{i}:{j}" +"}: "+f"{loss_}")
                 
         
