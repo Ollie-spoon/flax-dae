@@ -402,8 +402,8 @@ class ConvolutionalBlock(nn.Module):
     @nn.compact
     def __call__(self, x):
         x = nn.Conv(features=self.features, kernel_size=(self.kernel_size), padding=self.padding)(x)
-        x = nn.GroupNorm(group_size=4, num_groups=None)(x)
-        # x = nn.LayerNorm()(x)
+        # x = nn.GroupNorm(group_size=4, num_groups=None)(x)
+        x = nn.LayerNorm()(x)
         x = nn.gelu(x)
         
         return x

@@ -233,6 +233,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     
     prev_state = state
     prev_loss = jnp.inf
+    revert_count = 0
     
     batches_per_cycle = config.epoch_size // config.batch_size
     
@@ -285,17 +286,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
                 logging.info("NaN loss detected. Exiting training.")
                 break
         
-        # Check for gradient explosion
-        if epoch > 5 and metrics["loss"] > 10 * prev_loss:
-            print(f"Loss has increased by more than an order of magnitude. Reverting.")
-            state = prev_state
-            continue
-        else:
-            prev_state = state
-            prev_loss = metrics["loss"]
+        # # Check for gradient explosion
+        # if revert_count < 5 and epoch > 5 and metrics["loss"] > 10 * prev_loss:
+        #     print(f"Loss has increased by more than an order of magnitude. Reverting.")
+        #     revert_count += 1
+        #     state = prev_state
+        #     continue
+        # else:
+        #     revert_count = 0
+        #     prev_state = state
+        #     prev_loss = metrics["loss"]
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if best_loss*1.1 > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if epoch >= config.num_epochs/20 and best_loss*1.1 > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
         # if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
             
             # Create a validation data set 
