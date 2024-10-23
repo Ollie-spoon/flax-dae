@@ -68,6 +68,7 @@ def get_config():
         "fft_p": 1.0,
         "fft_m_max": 0.0,
         "fft_p_max": 0.0,
+        "fft_m_struct": 1.0,
         "l2": 0.005,
         "kl": 0.0,
         "output_std": 0.0,
@@ -76,8 +77,8 @@ def get_config():
         "params": {
             "a_min": 0,
             "a_max": 1,
-            "tau_min": 20,
-            "tau_max": 180,
+            "tau_min": 10,
+            "tau_max": 200,
             "decay_count": 2,
         },
         "t_max": 400, 
@@ -91,9 +92,9 @@ def get_config():
     config.hidden = 12
     config.dropout_rate = 0.1
     config.io_dim = 672
-    config.batch_size = 100
-    config.epoch_size = 1000
-    config.num_epochs = 1500
+    config.batch_size = 1000
+    config.epoch_size = 10000
+    config.num_epochs = 2000
     config.cycles_per_epoch = 5
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""

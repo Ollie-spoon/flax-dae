@@ -75,7 +75,7 @@ def create_generate_basic_data(
             a=2.0,
             shape=(iterations,), 
             dtype=dtype,
-        ) / 20.0 + 0.95
+        ) / 4.0 + 0.8
         
         # Combine the amplitudes and amplitude sums
         amplitudes = amplitudes * amp_sum[:, None]

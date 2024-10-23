@@ -8,6 +8,7 @@ import pickle
 from flax import linen as nn
 import matplotlib.pyplot as plt
 from time import time
+import ml_collections
 
 import sys
 import os
@@ -16,7 +17,7 @@ import os
 sys.path.append(os.path.abspath('C:/Users/omnic/OneDrive/Documents/MIT/Programming/dae/flax/dae'))
 
 from models import model
-from train import create_eval_f
+from train import create_eval_f, generate_prediction
 from input_pipeline import create_data_generator
 from data_processing import create_multi_exponential_decay, create_wavelet_approx, create_wavelet_decomposition
 from loss import create_compute_metrics, print_metrics
@@ -30,7 +31,7 @@ def denoise_bi_exponential():
     # rng = 3496390746816
     print(f"rng: {rng}")
     rng = key(rng)
-    rng, key1, key2, key3, key4, key5, key6, key7 = split(rng, 8)
+    rng, key1, key2, key3, key4, key5, key6, key7, key8 = split(rng, 9)
     
     # Define the test data parameters
     data_args = {
@@ -93,109 +94,20 @@ def denoise_bi_exponential():
     coeffs = wavedec(noisy_decay, wavelet, mode=mode)
     coeffs_clean = wavedec(decay, wavelet, mode=mode)
     clean_approx = coeffs_clean[0]
+    config = ml_collections.ConfigDict()
 
-    # # Load neural network model
-    # with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\mon_9_speculative.pkl", 'rb') as f:
-    #     checkpoint = pickle.load(f)
+    # Load neural network model
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_1100231024.pkl", 'rb') as f:
+        checkpoint = pickle.load(f)
     
     # # Current favourites:
+    # # permanent_saves\672_full_prediction_1100231024.pkl
     # # permanent_saves\thurs_lunch_current_best.pkl: Has excellent phase reduction, but not great magnitude reduction
     # # permanent_saves\68_95_20_0_6365_100snr_var.pkl: best magnitude reduction so far, I think, pretty good phase reduction.
     # # permanent_saves\thurs_19_latent_30.pkl: Pretty good, but I'm not sure if it's the best.
     # # permanent_saves\fft_m_max.pkl: 
 
     ## ~~ Optimization Clustering Minimum ~~ ##
-    
-    data_args = {
-        "params": {
-            "a_min": 0,
-            "a_max": 1,
-            "tau_min": 5,
-            "tau_max": 300,
-            "decay_count": 2,
-        },
-        "t_max": 400, 
-        "t_len": 1120, 
-        "SNR": 100,
-        "wavelet": "coif6", 
-        "mode": "zero",
-        "dtype": jnp.float32,
-        "max_dwt_level": 5,
-    }
-    
-    data_generator = create_data_generator(data_args)
-    
-    number_of_signals = 1
-    number_of_optimizations = 200
-    
-    # We're going to loop through n sinals and apply m optimizations to each.
-    # The idea is that we're going to find many local minima and then use a clustering algorithm
-    # to find the best local minima. 
-    # 
-    # The clustering will identify clusters of local minima that are close to each other.
-    # We will then take the medoid of the medoid cluster as our approximation for the local minimum.
-    from jax.scipy.optimize import minimize
-    from sklearn.cluster import HDBSCAN
-    
-    
-    a1 = 1.0
-    tau1 = 100.0
-    t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
-    for signal_i in range(number_of_signals):
-        clean_signal = a1 * jnp.exp(-t/tau1)
-        rng, noise_key, amp_key, tau_key = random.split(rng, 4)
-        noisy_signal = clean_signal + noise_scale * random.normal(noise_key, shape=t.shape)
-        
-        a0 = jax.random.uniform(amp_key, minval=0.5, maxval=1.5, shape=(number_of_optimizations,))
-        tau0 = jax.random.uniform(tau_key, minval=20, maxval=180, shape=(number_of_optimizations,))
-        
-        x0 = jnp.stack([a0, tau0], axis=1)
-        predictions = jnp.zeros((number_of_optimizations, 2))
-        
-        for optimization_i in range(number_of_optimizations):
-            # We're going to fit a clean signal to the noisy signal
-            
-            fun = lambda x: jnp.mean(jnp.square(noisy_signal - (x[0] * jnp.exp(-t/x[1]))))
-            
-            predictions[optimization_i] = minimize(fun, x0[optimization_i], method='BFGS')
-            
-        # Now we're going to cluster the predictions
-        # Perform HDBSCAN clustering
-        hdbscan = HDBSCAN(min_cluster_size=5, store_centers="medoid")
-        hdbscan.fit(predictions)
-        
-        labels = hdbscan.labels_
-        medoids = hdbscan.cluster_centers_
-        
-        # Now we're going to take the medoid of the medoids
-        final_medoid = find_medoid(medoids)
-        
-        # Plot the results
-        plt.scatter(predictions[:, 0], predictions[:, 1], c=labels, cmap='viridis')
-        plt.scatter(final_medoid[0], final_medoid[1], c='red', label='Final Medoid')
-        plt.title('HDBSCAN Clustering')
-        plt.xlabel('Feature 1')
-        plt.ylabel('Feature 2')
-        plt.legend()
-        plt.show()
-        
-    
-    def calculate_distances(points):
-        num_points = len(points)
-        distances = jnp.zeros((num_points, num_points))
-        for i in range(num_points):
-            for j in range(num_points):
-                distances = distances.at[i, j].set(jnp.linalg.norm(points[i] - points[j]))
-        return distances
-
-    def find_medoid(points):
-        distances = calculate_distances(points)
-        total_distances = jnp.sum(distances, axis=1)
-        medoid_index = jnp.argmin(total_distances)
-        return points[medoid_index]
-        
-    
-    # ## ~~ Evaluation ~~ ##
     
     # data_args = {
     #     "params": {
@@ -214,36 +126,244 @@ def denoise_bi_exponential():
     #     "max_dwt_level": 5,
     # }
     
-    # # Pass approximation coefficients through neural network
-    # get_metrics = create_compute_metrics(wavelet, mode)
-    # eval_f = create_eval_f(checkpoint['model_args'], data_args)
     # data_generator = create_data_generator(data_args)
     
-    # # Create a test data set 
-    # test_batch = next(data_generator(
-    #     key=key7, 
-    #     n=10000,
-    # ))
+    # number_of_signals = 1
+    # number_of_optimizations = 200
     
-    # noisy_approx, clean_signal = test_batch
+    # # We're going to loop through n sinals and apply m optimizations to each.
+    # # The idea is that we're going to find many local minima and then use a clustering algorithm
+    # # to find the best local minima. 
+    # # 
+    # # The clustering will identify clusters of local minima that are close to each other.
+    # # We will then take the medoid of the medoid cluster as our approximation for the local minimum.
+    # from jax.scipy.optimize import minimize
+    # from sklearn.cluster import HDBSCAN
     
-    # # wavelet_decomposition = jax.vmap(create_wavelet_decomposition(wavelet, mode, 4))
-    # # clean_decomposition = wavelet_decomposition(clean_signal)
     
-    # # diff = jax.vmap(lambda x, y: x - y[0])(noisy_approx, clean_decomposition)
+    # a1 = 1.0
+    # tau1 = 100.0
+    # t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
+    # for signal_i in range(number_of_signals):
+    #     clean_signal = a1 * jnp.exp(-t/tau1)
+    #     rng, noise_key, amp_key, tau_key = random.split(rng, 4)
+    #     noisy_signal = clean_signal + noise_scale * random.normal(noise_key, shape=t.shape)
+        
+    #     a0 = jax.random.uniform(amp_key, minval=0.5, maxval=1.5, shape=(number_of_optimizations,))
+    #     tau0 = jax.random.uniform(tau_key, minval=20, maxval=180, shape=(number_of_optimizations,))
+        
+    #     x0 = jnp.stack([a0, tau0], axis=1)
+    #     predictions = jnp.zeros((number_of_optimizations, 2))
+        
+    #     for optimization_i in range(number_of_optimizations):
+    #         # We're going to fit a clean signal to the noisy signal
+            
+    #         fun = lambda x: jnp.mean(jnp.square(noisy_signal - (x[0] * jnp.exp(-t/x[1]))))
+            
+    #         predictions[optimization_i] = minimize(fun, x0[optimization_i], method='BFGS')
+            
+    #     # Now we're going to cluster the predictions
+    #     # Perform HDBSCAN clustering
+    #     hdbscan = HDBSCAN(min_cluster_size=5, store_centers="medoid")
+    #     hdbscan.fit(predictions)
+        
+    #     labels = hdbscan.labels_
+    #     medoids = hdbscan.cluster_centers_
+        
+    #     # Now we're going to take the medoid of the medoids
+    #     final_medoid = find_medoid(medoids)
+        
+    #     # Plot the results
+    #     plt.scatter(predictions[:, 0], predictions[:, 1], c=labels, cmap='viridis')
+    #     plt.scatter(final_medoid[0], final_medoid[1], c='red', label='Final Medoid')
+    #     plt.title('HDBSCAN Clustering')
+    #     plt.xlabel('Feature 1')
+    #     plt.ylabel('Feature 2')
+    #     plt.legend()
+    #     plt.show()
+        
     
-    # # print(f"mse(wt, noisy): {jnp.mean(jnp.square(noisy_approx - clean_approx))}")
-    
-    # noisy_metrics = get_metrics(noisy_approx, noisy_approx, None, None, clean_signal, checkpoint['params'])
+    # def calculate_distances(points):
+    #     num_points = len(points)
+    #     distances = jnp.zeros((num_points, num_points))
+    #     for i in range(num_points):
+    #         for j in range(num_points):
+    #             distances = distances.at[i, j].set(jnp.linalg.norm(points[i] - points[j]))
+    #     return distances
 
-    # # Evaluate the model
-    # rng, z_rng = random.split(rng)
-    # metrics = eval_f(checkpoint['params'], test_batch, z_rng)
+    # def find_medoid(points):
+    #     distances = calculate_distances(points)
+    #     total_distances = jnp.sum(distances, axis=1)
+    #     medoid_index = jnp.argmin(total_distances)
+    #     return points[medoid_index]
+        
     
-    # print(f"Over 10000 samples, the original data had an average loss of:")
-    # print_metrics(0, noisy_metrics, time())
-    # print(f"Over 10000 samples, the denoised data had an average loss of:")
-    # print_metrics(0, metrics, time())
+    ## ~~ Evaluation ~~ ##
+    
+    data_args = {
+        "params": {
+            "a_min": 0,
+            "a_max": 1,
+            "tau_min": 20,
+            "tau_max": 180,
+            "decay_count": 2,
+        },
+        "t_max": 400, 
+        "t_len": 672, 
+        "SNR": 100,
+        "wavelet": "coif6", 
+        "mode": "zero",
+        "dtype": jnp.float32,
+        "max_dwt_level": 5,
+    }
+    config.loss_scaling = {
+        "wt": 0.0,
+        "t": 1.0,
+        "fft_m": 1.0,
+        "fft_p": 1.0,
+        "fft_m_max": 0.0,
+        "fft_p_max": 0.0,
+        "l2": 0.005,
+        "kl": 0.0,
+        "output_std": 0.0,
+    }
+    
+    t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
+    
+    data_generator = create_data_generator(data_args)
+    # Create a test data set 
+    test_batch = next(data_generator(
+        key=key7, 
+        n=100,
+    ))
+    
+    clean_signal, noisy_approx, noisy_signal, true_params, noise_powers = test_batch
+    
+    # Pass approximation coefficients through neural network
+    get_metrics = create_compute_metrics(config.loss_scaling, test_batch, wavelet, mode)
+    eval_f = create_eval_f(get_metrics, checkpoint['model_args'], None)
+    
+    class Params:
+        
+        def __init__(self, params):
+            self.params = params
+    
+    params = Params(checkpoint['params'])
+    
+    # wavelet_decomposition = jax.vmap(create_wavelet_decomposition(wavelet, mode, 4))
+    # clean_decomposition = wavelet_decomposition(clean_signal)
+    
+    # diff = jax.vmap(lambda x, y: x - y[0])(noisy_approx, clean_decomposition)
+    
+    # print(f"mse(wt, noisy): {jnp.mean(jnp.square(noisy_approx - clean_approx))}")
+    
+    print("Evaluating noisy data")
+    
+    noisy_metrics = get_metrics(clean_signal, noisy_approx, noisy_signal, None, None, None, checkpoint['params'])
+    
+    print("Done")
+    
+    # Evaluate the model
+    rng, z_rng = random.split(rng)
+    # metrics = eval_f(params, test_batch, z_rng)
+    print("Making predictions")
+    predictions = generate_prediction(checkpoint['params'], checkpoint['model_args'], noisy_signal, z_rng)
+    # predictions = eval_f_(checkpoint['params'], noisy_signal, checkpoint['model_args'], z_rng)
+    print("evaluating predictions")
+    metrics = get_metrics(clean_signal, noisy_approx, predictions, None, None, None, checkpoint['params'])
+    
+    
+    print(f"Over 10000 samples, the original data had an average loss of:")
+    print_metrics(noisy_metrics)
+    print(f"Over 10000 samples, the denoised data had an average loss of:")
+    print_metrics(metrics)
+    
+    # Now visualize the results
+    print("Visualizing the results for the following signal:")
+    print(f"Amplitudes: {true_params[0]}")
+    print(f"noise power: {noise_powers[0]}")
+    
+    # First the error in both the noisy and denoised signals
+    plt.plot(t, noisy_signal[0] - clean_signal[0], label='Noisy Error')
+    plt.plot(t, predictions[0] - clean_signal[0], label='Prediction Error')
+    plt.xlabel("time (ms)")
+    plt.ylabel("signal amplitude")
+    plt.legend()
+    plt.show()
+    
+    # Now the raw signals
+    plt.plot(t, clean_signal[0], label='Clean')
+    plt.plot(t, noisy_signal[0], label='Noisy')
+    plt.plot(t, predictions[0], label='Prediction')
+    plt.xlabel("time (ms)")
+    plt.ylabel("signal amplitude")
+    plt.legend()
+    plt.show()
+    
+    # Now the wavelet decomposition
+    clean_decomposition = wavedec(clean_signal[0], wavelet, mode=mode)
+    noisy_decomposition = wavedec(noisy_signal[0], wavelet, mode=mode)
+    prediction_decomposition = wavedec(predictions[0], wavelet, mode=mode)
+    
+    plt.plot(clean_decomposition[0], label='Clean')
+    plt.plot(noisy_decomposition[0], label='Noisy')
+    plt.plot(prediction_decomposition[0], label='Prediction')
+    plt.title("Comparison of wavelet decomposition coefficients")
+    plt.xlabel("index")
+    plt.ylabel("coefficient amplitude")
+    plt.legend()
+    plt.show()
+    
+    plt.plot(noisy_decomposition[0] - clean_decomposition[0], label='Noisy Error')
+    plt.plot(prediction_decomposition[0] - clean_decomposition[0], label='Prediction Error')
+    plt.title("Error in the wavelet decomposition coefficients")
+    plt.xlabel("index")
+    plt.ylabel("coefficient amplitude error")
+    plt.legend()
+    plt.show()
+    
+    # Now the fft of the signals
+    clean_fft = jnp.fft.fftshift(jnp.fft.fft(clean_signal[0]))
+    noisy_fft = jnp.fft.fftshift(jnp.fft.fft(noisy_signal[0]))
+    prediction_fft = jnp.fft.fftshift(jnp.fft.fft(predictions[0]))
+    
+    plt.plot(jnp.abs(clean_fft), label='Clean')
+    plt.plot(jnp.abs(noisy_fft), label='Noisy')
+    plt.plot(jnp.abs(prediction_fft), label='Prediction')
+    
+    plt.title("Magnitude of the Fourier transform of the signals")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.show()
+    
+    plt.plot(jnp.abs(noisy_fft) - jnp.abs(clean_fft), label='Noisy Error')
+    plt.plot(jnp.abs(prediction_fft) - jnp.abs(clean_fft), label='Prediction Error')
+    
+    plt.title("Error in the Magnitude of the Fourier transform of the signals")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.show()
+    
+    plt.plot(jnp.angle(clean_fft), label='Clean')
+    plt.plot(jnp.angle(noisy_fft), label='Noisy')
+    plt.plot(jnp.angle(prediction_fft), label='Prediction')
+    
+    plt.title("Phase of the Fourier transform of the signals")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Phase")
+    plt.legend()
+    plt.show()
+    
+    plt.plot(jnp.angle(noisy_fft) - jnp.angle(clean_fft), label='Noisy Error')
+    plt.plot(jnp.angle(prediction_fft) - jnp.angle(clean_fft), label='Prediction Error')
+    
+    plt.title("Error in the Phase of the Fourier transform of the signals")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Phase")
+    plt.legend()
+    plt.show()
     
     
     ## ~~ Visualisation ~~ ##
@@ -303,7 +423,7 @@ def denoise_bi_exponential():
     plt.plot(t, noisy_decay - decay, label='Noise (all freq)')
     plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     plt.plot(t, injected_original - decay, label='Before denoising (low freq)')
-    # plt.plot(t, injected_denoised - decay, label='After denoising (low freq)')
+    plt.plot(t,  - decay, label='After denoising (low freq)')
     plt.xlabel("time (ms)")
     plt.ylabel("signal noise amplitude")
     plt.legend()

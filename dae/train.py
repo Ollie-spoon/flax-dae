@@ -56,26 +56,7 @@ def create_train_step(get_metrics, model_args, gen_decays):
             # Apply the model with mutable batch_stats
             # (prediction, mean, logvar), new_state = models.model(
             
-            x, x0 = data_processing.normalize_signal(noisy_signal)
-            dx = data_processing.dx_from_x(x)
-            
-            prediction_dx = models.model(
-                hidden=model_args["hidden"],
-                latents=model_args["latents"],
-                dropout_rate=model_args["dropout_rate"],
-                io_dim=model_args["io_dim"],
-                noise_std=model_args["noise_std"],
-            ).apply(
-                {'params': params},# 'batch_stats': batch_stats},
-                x=dx,
-                z_rng=z_rng,
-                deterministic=False,
-                # mutable=["batch_stats"],
-                rngs={'dropout': dropout_rng},
-            )
-            
-            prediction = data_processing.x_from_dx(prediction_dx)
-            prediction = data_processing.unnormalize_signal(prediction, x0)
+            prediction = generate_prediction(params, model_args, noisy_signal, z_rng)
             
             # prediction_params = data_processing.reformat_prediction(prediction)
             # prediction_signal = gen_decays(prediction)
@@ -116,30 +97,7 @@ def create_eval_f(get_metrics, model_args, gen_decays):
         params = state.params
         clean_signal, noisy_approx, noisy_signal, true_params, noise_powers = batch
         
-        x, x0 = data_processing.normalize_signal(noisy_signal)
-        dx = data_processing.dx_from_x(x)
-        
-        # Apply the model in evaluation mode
-        # prediction, mean, logvar = models.model(
-        prediction_dx = models.model(
-            hidden=model_args["hidden"],
-            latents=model_args["latents"],
-            dropout_rate=model_args["dropout_rate"],
-            io_dim=model_args["io_dim"],
-            noise_std=model_args["noise_std"],
-        ).apply(
-            {'params': params}, #'batch_stats': batch_stats},
-            x=dx,
-            z_rng=z_rng,
-            deterministic=True,
-            # mutable=False  # No need to update batch_stats during evaluation
-        )
-        
-        # prediction_params = data_processing.reformat_prediction(prediction)
-        # predicted_decays = gen_decays(prediction_params)
-        
-        prediction = data_processing.x_from_dx(prediction_dx)
-        prediction = data_processing.unnormalize_signal(prediction, x0)
+        prediction = generate_prediction(params, model_args, noisy_signal, z_rng)
         
         
         # Extract four predictions to produce a comparison plot
@@ -165,6 +123,36 @@ def create_eval_f(get_metrics, model_args, gen_decays):
 
     return eval_f
 
+
+def generate_prediction(params, model_args, noisy_signal, z_rng):
+    
+    x, x0 = data_processing.normalize_signal(noisy_signal)
+    dx = data_processing.dx_from_x(x)
+    
+    # Apply the model in evaluation mode
+    # prediction, mean, logvar = models.model(
+    prediction = models.model(
+        hidden=model_args["hidden"],
+        latents=model_args["latents"],
+        dropout_rate=model_args["dropout_rate"],
+        io_dim=model_args["io_dim"],
+        noise_std=model_args["noise_std"],
+    ).apply(
+        {'params': params}, #'batch_stats': batch_stats},
+        x=dx,
+        z_rng=z_rng,
+        deterministic=True,
+        # mutable=False  # No need to update batch_stats during evaluation
+    )
+    
+    # prediction_params = data_processing.reformat_prediction(prediction)
+    # predicted_decays = gen_decays(prediction_params)
+    
+    prediction = data_processing.x_from_dx(prediction)
+    prediction = data_processing.unnormalize_signal(prediction, x0)
+    
+    return prediction
+    
 
 
 def train_and_evaluate(config: ml_collections.ConfigDict):

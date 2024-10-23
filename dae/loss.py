@@ -113,19 +113,18 @@ def create_noise_injection(wavelet, mode):
 @vmap
 @jit
 def fft_losses(clean_signal, noisy_signal, prediction_signal):
+    
+    # Perform FFT on the signals
     clean_fft = jnp.fft.fft(clean_signal)
     pred_fft = jnp.fft.fft(prediction_signal)
-    # noisy_fft = jnp.fft.fft(noisy_signal)
     
-    clean_mag = jnp.abs(clean_fft)[0:68]
-    clean_phase = jnp.angle(clean_fft)[0:68]
+    clean_mag = jnp.abs(clean_fft)
+    clean_phase = jnp.angle(clean_fft)
     
-    pred_mag = jnp.abs(pred_fft)[0:68]
-    pred_phase = jnp.angle(pred_fft)[0:68]
+    pred_mag = jnp.abs(pred_fft)
+    pred_phase = jnp.angle(pred_fft)
     
-    # noisy_mag = jnp.abs(noisy_fft)[0:68]
-    # noisy_phase = jnp.angle(noisy_fft)[0:68]
-    
+    # Calculate the basic losses
     mag_diff = jnp.abs(clean_mag - pred_mag)
     phase_diff = jnp.abs(clean_phase - pred_phase)
     
@@ -141,10 +140,15 @@ def fft_losses(clean_signal, noisy_signal, prediction_signal):
     # mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
     # phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
     
+    # Calculate the max losses
     mag_max = jnp.max(mag_diff)
     phase_max = jnp.max(phase_diff)
     
-    return mag_mean, phase_mean, mag_max, phase_max
+    # Calculate the structural loss (the sum of positive differences in the magnitude)
+    half_way = len(pred_mag)//2
+    struct_loss = jnp.sum(ReLU(jnp.diff(pred_mag[:half_way])))
+    
+    return mag_mean, phase_mean, mag_max, phase_max, struct_loss
 
 #### ~~~~ Define the loss functions dict ~~~~ ####
 
@@ -206,6 +210,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
                 metrics["fft_m_max"] = fft_losses_values[2].mean()
             if "fft_p_max" in loss_scaling:
                 metrics["fft_p_max"] = fft_losses_values[3].mean()
+            if "fft_m_struct" in loss_scaling:
+                metrics["fft_m_struct"] = fft_losses_values[4].mean()
         if "kl" in loss_scaling:
             metrics["kl"] = get_kl_divergence_lognorm(mean, logvar).mean()
         if "l2" in loss_scaling:
@@ -231,6 +237,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         "fft_p": 150000,
         "fft_m_max": 0.00003,
         "fft_p_max": 0.02,
+        "fft_m_struct": 10,
         "l2": 0.003,
         "kl": 0.000005,
         "output_std": 1.0,
