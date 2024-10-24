@@ -203,13 +203,15 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         
         # Compute losses
         if "wt" in loss_scaling:
-            clean_coeffs = wavedec(clean_signal, wavelet, mode)
-            recon_coeffs = wavedec(recon_signal, wavelet, mode)
+            # clean_coeffs = wavedec(clean_signal, wavelet, mode)
+            # recon_coeffs = wavedec(recon_signal, wavelet, mode)
+            clean_approx = get_approx(clean_signal)
+            recon_approx = get_approx(recon_signal)
             # approx_error = get_mse_loss(clean_coeffs[0], recon_coeffs[0]).mean()
             # detail_error = get_mse_loss(clean_coeffs[1], recon_coeffs[1]).mean()
             
             # metrics["wt"] = jnp.mean(jnp.array([get_mse_loss(clean_coeffs[i], recon_coeffs[i]).mean()/clean_coeffs[i].shape[-1] for i in range(len(clean_coeffs))]))
-            metrics["wt"] = get_mse_loss(clean_coeffs[0], recon_coeffs[0]).mean()
+            metrics["wt"] = get_mse_loss(clean_approx, recon_approx).mean()
         if "t" in loss_scaling:
             metrics["t"] = get_mse_loss(clean_signal, recon_signal).mean()
         if "fft_m" in loss_scaling or "fft_p" in loss_scaling or "fft_m_max" in loss_scaling or "fft_p_max" in loss_scaling:
@@ -261,6 +263,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     clean_signal, _, noisy_signal, _, _ = example_batch
     
     # Compute example metrics using baseline weights
+    get_approx = vmap(jit(lambda x: wavedec(x, wavelet, mode)[0]))
     noise_injection = create_noise_injection(wavelet, mode)
     
     
