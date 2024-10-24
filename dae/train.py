@@ -298,7 +298,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
             prev_loss = metrics["loss"]
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch >= 0:
+        if epoch >= 100:
         # if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
 
             comparison_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})

@@ -263,7 +263,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     clean_signal, _, noisy_signal, _, _ = example_batch
     
     # Compute example metrics using baseline weights
-    get_approx = vmap(jit(lambda x: wavedec(x, wavelet, mode)[0]))
+    get_approx = vmap(jit(lambda x: wavedec(x, wavelet, mode)[0][22:61]))
     noise_injection = create_noise_injection(wavelet, mode)
     
     
