@@ -196,5 +196,5 @@ def x_from_dx(dx):
     x: jnp.array, the reconstructed signal.
     """
     
-    x = jnp.append(0, jnp.cumsum(dx[:-1])) + 1
+    x = jnp.append(0, jnp.cumsum(dx[1:])) + 1 + dx[0]
     return x

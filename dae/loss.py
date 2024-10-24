@@ -88,9 +88,15 @@ def create_noise_injection(wavelet, mode):
     @jit
     def noise_injection(clean_signal, noisy_approx, denoised_approx):
         """ Inject noise into the clean signal via the approximation coefficients from the wavelet decomposition """
-
+        
+        jprint("clean_signal: {}", clean_signal.shape)
+        jprint("noisy_approx: {}", noisy_approx.shape)
+        jprint("denoised_approx: {}", denoised_approx.shape)
+        
         # forward wavelet transform
         clean_coeffs = wavedec(clean_signal, wavelet, mode)
+        
+        jprint("clean_coeffs: {}", jnp.array([c.shape for c in clean_coeffs]))
         
         # jprint("clean_coeffs: ", jnp.array([c.shape for c in clean_coeffs]))
         
@@ -112,7 +118,7 @@ def create_noise_injection(wavelet, mode):
 # FFT MSE Loss
 @vmap
 @jit
-def fft_losses(clean_signal, noisy_signal, prediction_signal):
+def fft_losses(clean_signal, prediction_signal):
     
     # Perform FFT on the signals
     clean_fft = jnp.fft.fft(clean_signal)
@@ -170,7 +176,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     """
     
     # Define compute metrics function with scaled loss weights
-    def compute_metrics(clean_signal, noisy_approx, recon_approx, std_dx, mean, logvar, model_params):
+    def compute_metrics(clean_signal, noisy_signal, recon_signal, std_dx, mean, logvar, model_params):
         """
         Computes metrics with scaled loss weights.
         
@@ -188,8 +194,8 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         
         # Perform noise injection
         
-        # clean_approx, injected_noisy, injected_denoised  = noise_injection(clean_signal, noisy_approx, recon_approx)
-        clean_approx, injected_noisy, injected_denoised = None, None, recon_approx
+        # clean_approx, recon_approx = noise_injection(clean_signal, recon_signal)
+        # clean_approx, injected_noisy, injected_denoised = None, None, recon_approx
         
         
         # Initialize metrics dictionary
@@ -197,11 +203,16 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
         
         # Compute losses
         if "wt" in loss_scaling:
-            metrics["wt"] = get_mse_loss(clean_approx, recon_approx).mean()
+            clean_coeffs = wavedec(clean_signal, wavelet, mode)
+            recon_coeffs = wavedec(recon_signal, wavelet, mode)
+            # approx_error = get_mse_loss(clean_coeffs[0], recon_coeffs[0]).mean()
+            # detail_error = get_mse_loss(clean_coeffs[1], recon_coeffs[1]).mean()
+            
+            metrics["wt"] = jnp.mean(jnp.array([get_mse_loss(clean_coeffs[i], recon_coeffs[i]).mean()/clean_coeffs[i].shape[-1] for i in range(len(clean_coeffs))]))
         if "t" in loss_scaling:
-            metrics["t"] = get_mse_loss(clean_signal, injected_denoised).mean()
+            metrics["t"] = get_mse_loss(clean_signal, recon_signal).mean()
         if "fft_m" in loss_scaling or "fft_p" in loss_scaling or "fft_m_max" in loss_scaling or "fft_p_max" in loss_scaling:
-            fft_losses_values = fft_losses(clean_signal, injected_noisy, injected_denoised)
+            fft_losses_values = fft_losses(clean_signal, recon_signal)
             if "fft_m" in loss_scaling:
                 metrics["fft_m"] = fft_losses_values[0].mean()
             if "fft_p" in loss_scaling:
@@ -231,7 +242,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     
     # Define baseline weights to get losses on the same order of magnitude
     scaled_weights = {
-        "wt": 17300,
+        "wt": 173000,
         "t": 300000,
         "fft_m": 10,
         "fft_p": 150000,
@@ -250,6 +261,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     
     # Compute example metrics using baseline weights
     noise_injection = create_noise_injection(wavelet, mode)
+    
     
     
     with loss_scaling.unlocked():

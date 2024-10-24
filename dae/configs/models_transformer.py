@@ -1,5 +1,17 @@
 from jax import jit, vmap, random, numpy as jnp
 from flax import linen as nn
+import chex
+
+from models import ConvolutionalBlock
+
+## TODO: 
+## 1. Modify embedding layer to work with vmap
+## 2. Check if the embedding layer is working correctly
+## 3. Check if the tokenization layer is working correctly
+## 4. Fix the MLP layer
+## 5. Implement an encoder block layer
+
+
 
 class TransformerConfig:
     
@@ -8,6 +20,10 @@ class TransformerConfig:
     max_tokens: int = 18
     token_dim: int = 64
     overlap_per_token: int = 8
+    
+    # Embedding parameters
+    embed_features: int = 16
+    embed_kernel_size: int = 3
     
     # Dimensions
     embed_dim: int = 24
@@ -61,23 +77,56 @@ class Tokenizer(nn.Module):
         num_tokens = (seq_len - token_dim)//(token_dim - overlap_per_token) + 1
         num_tokens = min(num_tokens, max_tokens)
         
-        # Calculate number of padding tokens
-        pad_len = max(0, max_tokens - num_tokens)
-        
-        # Pad input sequence
-        inputs = nn.pad(inputs, [(0, 0), (0, pad_len)])
-        
-        # Tokenize input sequence
-        tokens = nn.Conv(
-            features=token_dim,
-            kernel_size=(1, min_tokens),
-            strides=(1, overlap_per_token),
-            padding='VALID',
-            kernel_init=nn.initializers.xavier_uniform(),
-            bias_init=nn.initializers.zeros,
-        )(inputs)
-        
+        # Stack tokens - This should result in a shape of (batch_size, num_tokens, token_dim)
+        tokens = jnp.stack([inputs[:, i:i+token_dim] for i in range(0, seq_len-overlap_per_token, token_dim-overlap_per_token)], axis=1)
+
         return tokens
+    
+class Embedding(nn.Module):
+    
+    config: TransformerConfig
+    
+    def __call__(self, inputs):
+        """Applies Transformer Embedding module.
+        
+        Token embedding + positional encoding.
+        """
+        chex.assert_rank(inputs, 2)
+        chex.assert_equal(inputs.shape[1], config.token_dim)
+        
+        config = self.config
+        embed_dim = config.embed_dim
+        features = config.embed_features
+        max_tokens = config.max_tokens
+        
+        x = jnp.reshape(inputs, (inputs.shape[0], inputs.shape[1], 1))
+        
+        # Embedding layer (64 -> 60)
+        x = ConvolutionalBlock(features=features, kernel_size=5, padding='VALID')(x)
+        
+        # Pooling layer (60 -> 30)
+        x = nn.Conv(features=features, kernel_size=2, strides=2, padding='VALID')(x)
+        x = nn.LayerNorm()(x)
+        x = nn.gelu(x)
+        
+        # Embedding layer (30 -> 24)
+        x = ConvolutionalBlock(features=features, kernel_size=7, padding='VALID')(x)
+        
+        # Flatten (16 features -> 1 feature)
+        x = ConvolutionalBlock(features=1, kernel_size=1, padding='VALID')(x)
+        x = jnp.reshape(x, (x.shape[0], x.shape[1]))
+        
+        # At this point we have taken the input sequence and embedded it
+        # from 64 dimensions to 24 dimensions.
+                
+        # Learned positional encoding
+        pos_enc = self.param(
+            name='pos_enc', 
+            init_fn=nn.initializers.normal(stddev=0.02), 
+            shape=(1, max_tokens, embed_dim),
+        )
+        
+        return x + pos_enc[:, :x.shape[1], :]
 
 class MlpBlock(nn.Module):
     """Transformer MLP / feed-forward block.

@@ -69,7 +69,7 @@ def create_train_step(get_metrics, model_args, gen_decays):
             # jax.debug.print("clean_signal.shape: {}", clean_signal.shape)
 
             # Primary loss function
-            loss = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)["loss"]
+            loss = get_metrics(clean_signal, noisy_signal, prediction, None, None, None, params)["loss"]
             
             # Alternate loss function using pure parameter prediction
             # loss = get_metrics(batch, prediction)["loss"]
@@ -115,7 +115,7 @@ def create_eval_f(get_metrics, model_args, gen_decays):
         # jax.debug.print("clean_signal.shape: {}", clean_signal.shape)
 
         # Primary loss function
-        metrics = get_metrics(clean_signal, noisy_approx, prediction, None, None, None, params)
+        metrics = get_metrics(clean_signal, noisy_signal, prediction, None, None, None, params)
         
         # Alternate loss function using pure parameter prediction
         # metrics = get_metrics(batch, prediction)
@@ -270,7 +270,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         
         # Evaluate the model
         rng, eval_rng = random.split(rng)
-        metrics, comparison = eval_f(state, test_batch, eval_rng)
+        metrics, _ = eval_f(state, test_batch, eval_rng)
         
         metric_list.append(metrics)
         
@@ -286,37 +286,42 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
                 logging.info("NaN loss detected. Exiting training.")
                 break
         
-        # # Check for gradient explosion
-        # if revert_count < 5 and epoch > 5 and metrics["loss"] > 10 * prev_loss:
-        #     print(f"Loss has increased by more than an order of magnitude. Reverting.")
-        #     revert_count += 1
-        #     state = prev_state
-        #     continue
-        # else:
-        #     revert_count = 0
-        #     prev_state = state
-        #     prev_loss = metrics["loss"]
+        # Check for gradient explosion
+        if revert_count < 4 and epoch > 10 and metrics["loss"] > 50 * prev_loss:
+            print(f"Loss has increased by more than an order of magnitude. Reverting.")
+            revert_count += 1
+            state = prev_state
+            continue
+        else:
+            revert_count = 0
+            prev_state = state
+            prev_loss = metrics["loss"]
         
         # Save the best model, assuming that it performs equally well on the validation set
-        if epoch >= config.num_epochs/20 and best_loss*1.1 > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
+        if epoch >= config.num_epochs/20:
         # if epoch > config.num_epochs/4 and best_loss > sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"}):
-            
-            # Create a validation data set 
-            rng, test_rng, z_rng = random.split(rng, 3)
-            test_batch = next(data_generator(
-                key=test_rng, 
-                n=config.batch_size,
-            ))
-            metrics, _ = eval_f(state, test_batch, eval_rng)
-            
+
             comparison_loss = sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
+            if best_loss*1.1 > comparison_loss:
             
-            metrics["loss"] = comparison_loss
-            
-            if comparison_loss < best_loss:
-                best_loss = comparison_loss
-                loss.print_metrics(metrics, f"New best loss at epoch: {epoch + 1}, ")
-                utils.save_model(state, 0, config.working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
+                # Create a validation data set 
+                rng, test_rng, z_rng = random.split(rng, 3)
+                test_batch = next(data_generator(
+                    key=test_rng, 
+                    n=config.batch_size,
+                ))
+                metrics, _ = eval_f(state, test_batch, eval_rng)
+                
+                # Combine the two losses and take the average to provide a more robust comparison
+                comparison_loss += sum(value for key, value in metrics.items() if key not in {"loss", "l2", "kl"})
+                comparison_loss /= 2
+                
+                metrics["loss"] = comparison_loss
+                
+                if comparison_loss < best_loss:
+                    best_loss = comparison_loss
+                    loss.print_metrics(metrics, f"New best loss at epoch: {epoch + 1}, ")
+                    utils.save_model(state, 0, config.working_dir + 'tmp/checkpoints/best_this_run', model_args, logging=False)
         
         # Save the model
         if (epoch + 1) % 100 == 0:

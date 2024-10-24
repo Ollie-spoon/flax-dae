@@ -62,7 +62,7 @@ def get_config():
         # [20000, 0.00002*scale],
     ])
     config.loss_scaling = {
-        "wt": 0.0,
+        "wt": 0.1,
         "t": 1.0,
         "fft_m": 1.0,
         "fft_p": 1.0,
@@ -90,7 +90,7 @@ def get_config():
     }
     config.latents = 4
     config.hidden = 12
-    config.dropout_rate = 0.1
+    config.dropout_rate = 0.2
     config.io_dim = 672
     config.batch_size = 1000
     config.epoch_size = 10000

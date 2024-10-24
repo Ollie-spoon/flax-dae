@@ -28,6 +28,7 @@ class ResidualBlock(nn.Module):
         # Hidden layer 1  (io_dim -> hidden)
         x = nn.Dense(features=self.hidden)(x)
         d = nn.GroupNorm(use_running_average=deterministic)(x)
+    
         x = nn.gelu(x)
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
         
@@ -169,6 +170,7 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
         io_dim=io_dim,
         features=hidden,
         padding='SAME',
+        dropout_rate=dropout_rate,
     )
 
 
@@ -306,6 +308,7 @@ class UNet(nn.Module):
     io_dim: int
     features: int
     padding: str = 'SAME'
+    dropout_rate: float = 0.2
     
     @nn.compact
     def __call__(self, x, z_rng, deterministic: bool):
@@ -374,9 +377,10 @@ class UNet(nn.Module):
         
         # jax.debug.print("after reshaping: {}", x0.shape)
         
-        x0 = nn.Dense(features=self.io_dim*2)(x0)
+        x0 = nn.Dense(features=self.io_dim*3)(x0)
+        x0 = nn.LayerNorm()(x0)
         x0 = nn.gelu(x0)
-        x0 = nn.Dropout(rate=0.2)(x0, deterministic=deterministic)
+        x0 = nn.Dropout(rate=self.dropout_rate)(x0, deterministic=deterministic)
         
         # # jax.debug.print("After MLP-up: {}", x0.shape)
         

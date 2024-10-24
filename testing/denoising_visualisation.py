@@ -97,11 +97,12 @@ def denoise_bi_exponential():
     config = ml_collections.ConfigDict()
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_1100231024.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_1758231024.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # # Current favourites:
     # # permanent_saves\672_full_prediction_1100231024.pkl
+    # # permanent_saves\672_full_prediction_1758231024.pkl
     # # permanent_saves\thurs_lunch_current_best.pkl: Has excellent phase reduction, but not great magnitude reduction
     # # permanent_saves\68_95_20_0_6365_100snr_var.pkl: best magnitude reduction so far, I think, pretty good phase reduction.
     # # permanent_saves\thurs_19_latent_30.pkl: Pretty good, but I'm not sure if it's the best.
@@ -217,12 +218,13 @@ def denoise_bi_exponential():
         "max_dwt_level": 5,
     }
     config.loss_scaling = {
-        "wt": 0.0,
+        "wt": 1.0,
         "t": 1.0,
         "fft_m": 1.0,
         "fft_p": 1.0,
         "fft_m_max": 0.0,
         "fft_p_max": 0.0,
+        "fft_m_struct": 1.0,
         "l2": 0.005,
         "kl": 0.0,
         "output_std": 0.0,
@@ -259,7 +261,7 @@ def denoise_bi_exponential():
     
     print("Evaluating noisy data")
     
-    noisy_metrics = get_metrics(clean_signal, noisy_approx, noisy_signal, None, None, None, checkpoint['params'])
+    noisy_metrics = get_metrics(clean_signal, noisy_signal, noisy_signal, None, None, None, checkpoint['params'])
     
     print("Done")
     
