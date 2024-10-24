@@ -131,24 +131,29 @@ def fft_losses(clean_signal, prediction_signal):
     pred_phase = jnp.angle(pred_fft)
     
     # Calculate the basic losses
-    mag_diff = jnp.abs(clean_mag - pred_mag)
-    phase_diff = jnp.abs(clean_phase - pred_phase)
+    # mag_diff = jnp.abs(clean_mag - pred_mag)
+    # phase_diff = jnp.abs(clean_phase - pred_phase)
     
-    mag_mean = jnp.sqrt(
-        jnp.mean(jnp.square(mag_diff)) +
-        jnp.mean(mag_diff)
-    )
-    phase_mean = jnp.sqrt(
-        jnp.mean(jnp.square(phase_diff)) + 
-        jnp.mean(phase_diff)
-    )
+    mag_mean = jnp.mean(jnp.square(clean_mag - pred_mag))
+    phase_mean = jnp.mean(jnp.square(clean_phase - pred_phase))
+    
+    # mag_mean = jnp.sqrt(
+    #     jnp.mean(jnp.square(mag_diff)) +
+    #     jnp.mean(mag_diff)
+    # )
+    # phase_mean = jnp.sqrt(
+    #     jnp.mean(jnp.square(phase_diff)) + 
+    #     jnp.mean(phase_diff)
+    # )
     
     # mag_max = jnp.sum(ReLU(jnp.abs(pred_mag) - jnp.abs(noisy_mag)))
     # phase_max = jnp.sum(ReLU(jnp.abs(pred_phase) - jnp.abs(noisy_phase)))
     
     # Calculate the max losses
-    mag_max = jnp.max(mag_diff)
-    phase_max = jnp.max(phase_diff)
+    # mag_max = jnp.max(mag_diff)
+    # phase_max = jnp.max(phase_diff)
+    mag_max = 1
+    phase_max = 1
     
     # Calculate the structural loss (the sum of positive differences in the magnitude)
     half_way = len(pred_mag)//2
@@ -211,7 +216,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
             # detail_error = get_mse_loss(clean_coeffs[1], recon_coeffs[1]).mean()
             
             # metrics["wt"] = jnp.mean(jnp.array([get_mse_loss(clean_coeffs[i], recon_coeffs[i]).mean()/clean_coeffs[i].shape[-1] for i in range(len(clean_coeffs))]))
-            metrics["wt"] = get_mse_loss(clean_approx, recon_approx).mean()
+            metrics["wt"] = get_mae_loss(clean_approx, recon_approx).mean()
         if "t" in loss_scaling:
             metrics["t"] = get_mse_loss(clean_signal, recon_signal).mean()
         if "fft_m" in loss_scaling or "fft_p" in loss_scaling or "fft_m_max" in loss_scaling or "fft_p_max" in loss_scaling:
@@ -263,7 +268,7 @@ def create_compute_metrics(loss_scaling: Dict[str, float], example_batch, wavele
     clean_signal, _, noisy_signal, _, _ = example_batch
     
     # Compute example metrics using baseline weights
-    get_approx = vmap(jit(lambda x: wavedec(x, wavelet, mode)[0][22:61]))
+    get_approx = vmap(jit(lambda x: wavedec(x, wavelet, mode)[0]))
     noise_injection = create_noise_injection(wavelet, mode)
     
     

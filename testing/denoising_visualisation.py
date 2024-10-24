@@ -97,7 +97,7 @@ def denoise_bi_exponential():
     config = ml_collections.ConfigDict()
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_2344231024.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_1023241024.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # # Current favourites:
@@ -212,8 +212,8 @@ def denoise_bi_exponential():
         "t_max": 400, 
         "t_len": 672, 
         "SNR": 100,
-        "wavelet": "coif6", 
-        "mode": "zero",
+        "wavelet": "db12", 
+        "mode": "constant",
         "dtype": jnp.float32,
         "max_dwt_level": 5,
     }
@@ -229,6 +229,9 @@ def denoise_bi_exponential():
         "kl": 0.0,
         "output_std": 0.0,
     }
+    
+    wavelet = data_args["wavelet"]
+    mode = data_args["mode"]
     
     t = jnp.linspace(0, data_args["t_max"], data_args["t_len"])
     
@@ -319,7 +322,7 @@ def denoise_bi_exponential():
     
     plt.plot(noisy_decomposition[0] - clean_decomposition[0], label='Noisy Error')
     plt.plot(prediction_decomposition[0] - clean_decomposition[0], label='Prediction Error')
-    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
+    plt.plot(t[:len(noisy_decomposition)], jnp.zeros_like(t[:len(noisy_decomposition)]), label='zero', linewidth=0.5, color='black')
     plt.title("Error in the wavelet decomposition coefficients")
     plt.xlabel("index")
     plt.ylabel("coefficient amplitude error")
@@ -363,7 +366,6 @@ def denoise_bi_exponential():
     
     plt.plot(jnp.angle(noisy_fft) - jnp.angle(clean_fft), label='Noisy Error')
     plt.plot(jnp.angle(prediction_fft) - jnp.angle(clean_fft), label='Prediction Error')
-    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     
     plt.title("Error in the Phase of the Fourier transform of the signals")
     plt.xlabel("Frequency (Hz)")

@@ -377,24 +377,24 @@ class UNet(nn.Module):
         
         # jax.debug.print("after reshaping: {}", x0.shape)
         
-        x0 = nn.Dense(features=self.io_dim*3)(x0)
-        x0 = nn.LayerNorm()(x0)
-        x0 = nn.gelu(x0)
-        x0 = nn.Dropout(rate=self.dropout_rate)(x0, deterministic=deterministic)
+        dx = nn.Dense(features=self.io_dim*2)(x0)
+        dx = nn.LayerNorm()(dx)
+        dx = nn.gelu(dx)
+        dx = nn.Dropout(rate=self.dropout_rate)(dx, deterministic=deterministic)
         
         # # jax.debug.print("After MLP-up: {}", x0.shape)
         
-        x0 = nn.Dense(features=self.io_dim)(x0)
+        dx = nn.Dense(features=self.io_dim)(dx)
         
         # jax.debug.print("After MLP-down: {}", x0.shape)
 
         # x_sign = nn.Dense(features=self.io_dim)(x0)
         # x_power = nn.Dense(features=self.io_dim)(x0)
         
-        # x = reparameterize_dx(z_rng, x_sign, x_power, deterministic)
+        # x = reparameterize_wdx(z_rng, x_sign, x_power, deterministic)
         
         
-        return x0 # + x
+        return x0 + dx
 
 class ConvolutionalBlock(nn.Module):
     
@@ -426,7 +426,7 @@ class UNetDownLayer(nn.Module):
     @nn.compact
     def __call__(self, x):
         # x = nn.pooling.avg_pool(x, window_shape=(2,), strides=(2,), padding='VALID')
-        x = nn.Conv(features=x.shape[-1], kernel_size=2, strides=2, feature_group_count=x.shape[-1], padding=self.padding)(x)
+        x = nn.Conv(features=x.shape[-1], kernel_size=2, strides=2, padding=self.padding)(x)
         
         x = ConvolutionalBlock(self.features, self.kernel_size, self.padding, self.deterministic)(x)
         x = ConvolutionalBlock(self.features, self.kernel_size, self.padding, self.deterministic)(x)
