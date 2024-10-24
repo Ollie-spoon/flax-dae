@@ -97,7 +97,7 @@ def denoise_bi_exponential():
     config = ml_collections.ConfigDict()
 
     # Load neural network model
-    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_1758231024.pkl", 'rb') as f:
+    with open(r"C:\Users\omnic\OneDrive\Documents\MIT\Programming\dae\flax\permanent_saves\672_full_prediction_2344231024.pkl", 'rb') as f:
         checkpoint = pickle.load(f)
     
     # # Current favourites:
@@ -282,12 +282,13 @@ def denoise_bi_exponential():
     
     # Now visualize the results
     print("Visualizing the results for the following signal:")
-    print(f"Amplitudes: {true_params[0]}")
+    print(f"params: {true_params[0]}")
     print(f"noise power: {noise_powers[0]}")
     
     # First the error in both the noisy and denoised signals
     plt.plot(t, noisy_signal[0] - clean_signal[0], label='Noisy Error')
     plt.plot(t, predictions[0] - clean_signal[0], label='Prediction Error')
+    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     plt.xlabel("time (ms)")
     plt.ylabel("signal amplitude")
     plt.legend()
@@ -318,6 +319,7 @@ def denoise_bi_exponential():
     
     plt.plot(noisy_decomposition[0] - clean_decomposition[0], label='Noisy Error')
     plt.plot(prediction_decomposition[0] - clean_decomposition[0], label='Prediction Error')
+    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     plt.title("Error in the wavelet decomposition coefficients")
     plt.xlabel("index")
     plt.ylabel("coefficient amplitude error")
@@ -341,6 +343,7 @@ def denoise_bi_exponential():
     
     plt.plot(jnp.abs(noisy_fft) - jnp.abs(clean_fft), label='Noisy Error')
     plt.plot(jnp.abs(prediction_fft) - jnp.abs(clean_fft), label='Prediction Error')
+    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     
     plt.title("Error in the Magnitude of the Fourier transform of the signals")
     plt.xlabel("Frequency (Hz)")
@@ -360,6 +363,7 @@ def denoise_bi_exponential():
     
     plt.plot(jnp.angle(noisy_fft) - jnp.angle(clean_fft), label='Noisy Error')
     plt.plot(jnp.angle(prediction_fft) - jnp.angle(clean_fft), label='Prediction Error')
+    plt.plot(t, jnp.zeros_like(t), label='zero', linewidth=0.5, color='black')
     
     plt.title("Error in the Phase of the Fourier transform of the signals")
     plt.xlabel("Frequency (Hz)")
