@@ -165,14 +165,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
     
     # Generate extract the input/output dimensions and maximum number of 
     # dwt transforms allowed from this length signal
-    io_dim, max_dwt_level = utils.get_approx_length(config.data_args["t_len"], config.data_args["wavelet"])
-    logging.info(f"io_dim: {io_dim}")
-    if io_dim != config.io_dim:
-        logging.info(f"Warning: approximation constant length ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
+    max_dwt_len, max_dwt_level = utils.get_approx_length(config.data_args["t_len"], config.data_args["wavelet"])
+    logging.info(f"io_dim: {config.io_dim}")
+    # if io_dim != config.io_dim:
+    #     logging.info(f"Warning: approximation constant length ({io_dim}) does not match the data dimension requested in config flags ({config.io_dim})")
     
     # Update the config with the correct io_dim and max_dwt_level
     with config.unlocked():
-        # config.io_dim = io_dim
+        # config.io_dim = config.data_args["t_len"]
         config.data_args["max_dwt_level"] = max_dwt_level
     
     # Create the data generator

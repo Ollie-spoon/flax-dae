@@ -198,3 +198,41 @@ def x_from_dx(dx):
     
     x = jnp.append(0, jnp.cumsum(dx[1:])) + 1 + dx[0]
     return x
+
+class Tokenizer:
+    
+    def __init__(self, token_dim, overlap_per_token, max_tokens):
+        self.token_dim = token_dim
+        self.overlap_per_token = overlap_per_token
+        self.max_tokens = max_tokens
+        
+        self.min_len = token_dim
+        self.max_len = self.get_len_from_tokens(max_tokens)
+    
+    def tokenize(self, data):
+        
+        # first we need to clip and pad the data to fit the tokens
+        padded, sequence_length = self.pad_signal(data)
+        
+        unpadded_len = jnp.floor((input.shape[1] - token_dim) / (token_dim - overlap_per_token) + 1, dtype=jnp.int32)
+        mask = jnp.zeros(max_tokens)
+        mask = mask.at[:unpadded_len].set(1)
+
+    def detokenize(self, tokens):
+        ## Put detokenization code here
+        pass
+    
+    @vmap
+    def pad_signal(self, data):
+        padding_length = self.get_tokens_from_len(data.shape[-1])
+        clip_len = jnp.min(data.shape[-1], self.max_len)
+        padded = jnp.zeros(self.max_len)
+        padded = padded.at[:clip_len].set(input)
+        return padded, padding_length
+    
+    def get_len_from_tokens(self, tokens) -> int:
+        return tokens*(self.token_dim - self.overlap_per_token) + self.overlap_per_token
+    
+    def get_tokens_from_len(self, length) -> int:
+        return (length - self.overlap_per_token) // (self.token_dim - self.overlap_per_token) + 1
+    

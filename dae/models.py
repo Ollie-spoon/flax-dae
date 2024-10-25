@@ -169,7 +169,7 @@ def model(latents, hidden, dropout_rate, io_dim, noise_std, dtype=jnp.float32):
         kernel_size=7,
         io_dim=io_dim,
         features=hidden,
-        padding='SAME',
+        padding='VALID',
         dropout_rate=dropout_rate,
     )
 
@@ -307,7 +307,7 @@ class UNet(nn.Module):
     kernel_size: int
     io_dim: int
     features: int
-    padding: str = 'SAME'
+    padding: str = 'VALID'
     dropout_rate: float = 0.2
     
     @nn.compact
@@ -319,65 +319,81 @@ class UNet(nn.Module):
         
         # jax.debug.print("input: {}", x.shape)
         
+        ActNorm = lambda x: nn.gelu(nn.LayerNorm()(x))
+        DownConv = lambda x, features: ActNorm(nn.Conv(features=features, kernel_size=self.kernel_size, padding=self.padding)(x))
+        DownPool = lambda x, features: ActNorm(nn.Conv(features=features, kernel_size=2, strides=2, padding=self.padding)(x))
+        UpConv = lambda x, features: ActNorm(nn.ConvTranspose(features=features, kernel_size=self.kernel_size, padding='VALID')(x))
+        UpPool = lambda x, features: ActNorm(nn.ConvTranspose(features=features, kernel_size=2, strides=2, padding='VALID')(x))
+        
+        DownLayer = lambda x, features: DownConv(DownConv(DownPool(x, features), features), features)
+        UpLayer = lambda x, x_skip, features: UpConv(UpConv(jnp.concatenate([x_skip, UpPool(x, features)], axis=-1), features), features)
+        
+        
         # Contracting path (Encoder)
-        # Initial convolutional block
-        x0 = ConvolutionalBlock(self.features, self.kernel_size, self.padding, deterministic)(x0)
-        x0 = ConvolutionalBlock(self.features, self.kernel_size, self.padding, deterministic)(x0)
+        # Initial convolutional block (672 -> 660)
+        x0 = DownConv(x0, self.features) # (676 -> 670)
+        x0 = DownConv(x0, self.features) # (670 -> 664)
         
         # jax.debug.print("x0: {}", x0.shape)
         
         # Layer 1 (io_dim -> io_dim/2)
-        x1 = UNetDownLayer(self.features*2, self.kernel_size, self.padding, deterministic)(x0)
+        
+        x1 = DownLayer(x0, self.features*2) # (664 -> 332 - 2*6 = 320)
         
         # jax.debug.print("x1: {}", x1.shape)
         
         # Layer 2 (io_dim/2 -> io_dim/4)
-        x2 = UNetDownLayer(self.features*4, self.kernel_size, self.padding, deterministic)(x1)
+        x2 = DownLayer(x1, self.features*4) # (320 -> 160 - 2*6 = 148)
         
         # jax.debug.print("x2: {}", x2.shape)
         
         # Layer 3 (io_dim/2 -> io_dim/4)
-        x3 = UNetDownLayer(self.features*8, self.kernel_size, self.padding, deterministic)(x2)
+        x3 = DownLayer(x2, self.features*8) # (148 -> 74 - 2*6 = 62)
         
         # jax.debug.print("x3: {}", x3.shape)
         
         # Layer 4 (io_dim/4 -> io_dim/8)
-        x4 = UNetDownLayer(self.features*12, self.kernel_size, self.padding, deterministic)(x3)
+        x4 = DownLayer(x3, self.features*12) # (62 -> 31 - 2*6 = 19)
+        
+        # jax.debug.print("Bottom Shape: {}", x4.shape)
+        
+        x4 = UpConv(x4, self.features*12) # (19 -> 25)
+        x4 = UpConv(x4, self.features*12) # (25 -> 31)
         
         # jax.debug.print("x4: {}", x4.shape)
+        
         # Expanding path (Decoder)
         
         # Upsample 1 (io_dim/8 -> io_dim/4)
-        x3 = UNetUpLayer(self.features*8, self.kernel_size, self.padding, deterministic)(x4, x3)
+        x3 = UpLayer(x4, x3, self.features*8) # (31 -> 62 + 2*6 = 74)
         
         # jax.debug.print("x3: {}", x3.shape)
         
         # Upsample 2 (io_dim/4 -> io_dim/2)
-        x2 = UNetUpLayer(self.features*4, self.kernel_size, self.padding, deterministic)(x3, x2)
+        x2 = UpLayer(x3, x2, self.features*4) # (74 -> 148 + 2*6 = 160)
         
         # jax.debug.print("x2: {}", x2.shape)
         
         # Upsample 3 (io_dim/4 -> io_dim/2)
-        x1 = UNetUpLayer(self.features*2, self.kernel_size, self.padding, deterministic)(x2, x1)
+        x1 = UpLayer(x2, x1, self.features*2) # (160 -> 320 + 2*6 = 332)
         
         # jax.debug.print("x1: {}", x1.shape)
         
         # Upsample 4 (io_dim/2 -> io_dim)
-        x0 = UNetUpLayer(self.features, self.kernel_size, self.padding, deterministic)(x1, x0)
+        x0 = UpLayer(x1, x0, self.features) # (332 -> 664 + 2*6 = 676)
         
         # jax.debug.print("x0: {}", x0.shape)
         
         # Final output layer
         x0 = nn.Conv(features=1, kernel_size=1, padding='VALID')(x0)  # Reduce to single output channel
-        x0 = nn.gelu(x0)
         
         # jax.debug.print("output: {}", x0.shape)
         
         x0 = jnp.reshape(x0, (x0.shape[0], x0.shape[1]))
         
-        # jax.debug.print("after reshaping: {}", x0.shape)
+        # jax.debug.print("output: {}", x0.shape)
         
-        dx = nn.Dense(features=self.io_dim*2)(x0)
+        dx = nn.Dense(features=self.io_dim*4)(x0)
         dx = nn.LayerNorm()(dx)
         dx = nn.gelu(dx)
         dx = nn.Dropout(rate=self.dropout_rate)(dx, deterministic=deterministic)
@@ -386,7 +402,7 @@ class UNet(nn.Module):
         
         dx = nn.Dense(features=self.io_dim)(dx)
         
-        # jax.debug.print("After MLP-down: {}", x0.shape)
+        # jax.debug.print("After MLP-down: {}", dx.shape)
 
         # x_sign = nn.Dense(features=self.io_dim)(x0)
         # x_power = nn.Dense(features=self.io_dim)(x0)
@@ -396,17 +412,18 @@ class UNet(nn.Module):
         
         return x0 + dx
 
+
+
 class ConvolutionalBlock(nn.Module):
     
     features: int
     kernel_size: int
     padding: str
-    deterministic: bool
+    conv: nn.Module = nn.Conv
     
     @nn.compact
     def __call__(self, x):
-        x = nn.Conv(features=self.features, kernel_size=(self.kernel_size), padding=self.padding)(x)
-        # x = nn.GroupNorm(group_size=4, num_groups=None)(x)
+        x = self.conv(features=self.features, kernel_size=self.kernel_size, padding=self.padding)(x)
         x = nn.LayerNorm()(x)
         x = nn.gelu(x)
         

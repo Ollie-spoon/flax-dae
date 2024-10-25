@@ -22,7 +22,7 @@ def get_config():
         
         
         ## All of the below lr are for adam and are waaaay too high for sgd
-        [1, 0.00015],
+        [1, 0.0001],
         # [5, 0.005],
         # [9, 0.002],
         # [13, 0.001],
@@ -62,7 +62,7 @@ def get_config():
         # [20000, 0.00002*scale],
     ])
     config.loss_scaling = {
-        "wt": 1.0,
+        "wt": 0.0,
         "t": 1.0,
         "fft_m": 1.0,
         "fft_p": 1.0,
@@ -82,7 +82,7 @@ def get_config():
             "decay_count": 2,
         },
         "t_max": 400, 
-        "t_len": 672, 
+        "t_len": 676, 
         "SNR": 100,
         "wavelet": "db12", 
         "mode": "constant",
@@ -91,10 +91,10 @@ def get_config():
     config.latents = 4
     config.hidden = 10
     config.dropout_rate = 0.2
-    config.io_dim = 672
+    config.io_dim = config.data_args["t_len"]
     config.batch_size = 1250
     config.epoch_size = 12500
-    config.num_epochs = 2500
+    config.num_epochs = 5000
     config.cycles_per_epoch = 5
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
