@@ -326,6 +326,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         # Save the model
         if (epoch + 1) % 100 == 0:
             utils.save_model(state, epoch + 1, config.working_dir + 'tmp/checkpoints', model_args)
+            logging.info(f"Model saved after epoch {epoch + 1}")
             # state = original_state
             # utils.plot_comparison(comparison, epoch+1, config.working_dir + 'tmp/checkpoints/reconstruction_{}.png'.format(epoch+1))
             

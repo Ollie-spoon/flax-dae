@@ -380,13 +380,16 @@ class UNet(nn.Module):
         # jax.debug.print("x1: {}", x1.shape)
         
         # Upsample 4 (io_dim/2 -> io_dim)
-        x0 = UpLayer(x1, x0, self.features) # (332 -> 664 + 2*6 = 676)
+        x1 = UpPool(x1, self.features) # (332 -> 664)
+        x0 = jnp.concatenate([x0, x1], axis=-1)  # Skip connection
+        x0 = UpConv(x0, self.features) # (664 -> 670)
+        x0 = UpConv(x0, self.features) # (670 -> 676)
         
         # jax.debug.print("x0: {}", x0.shape)
         
         # Final output layer
         x0 = nn.Conv(features=1, kernel_size=1, padding='VALID')(x0)  # Reduce to single output channel
-        
+        x0 = nn.gelu(x0)
         # jax.debug.print("output: {}", x0.shape)
         
         x0 = jnp.reshape(x0, (x0.shape[0], x0.shape[1]))
@@ -401,6 +404,7 @@ class UNet(nn.Module):
         # # jax.debug.print("After MLP-up: {}", x0.shape)
         
         dx = nn.Dense(features=self.io_dim)(dx)
+        dx = nn.gelu(dx)
         
         # jax.debug.print("After MLP-down: {}", dx.shape)
 
