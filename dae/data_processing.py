@@ -199,40 +199,101 @@ def x_from_dx(dx):
     x = jnp.append(0, jnp.cumsum(dx[1:])) + 1 + dx[0]
     return x
 
-class Tokenizer:
+class TransformerTokenizer:
     
-    def __init__(self, token_dim, overlap_per_token, max_tokens):
+    def __init__(self, token_dim, max_tokens, overlap_per_token):
         self.token_dim = token_dim
-        self.overlap_per_token = overlap_per_token
         self.max_tokens = max_tokens
+        self.overlap_per_token = overlap_per_token
         
+        self.token_dim_no_overlap = token_dim - overlap_per_token
+        
+        # len values correspond to the length in signal represenation
         self.min_len = token_dim
         self.max_len = self.get_len_from_tokens(max_tokens)
     
+    ## TOKENIZAITON FUNCTIONS ##
+    @vmap
+    @jit
     def tokenize(self, data):
         
         # first we need to clip and pad the data to fit the tokens
-        padded, sequence_length = self.pad_signal(data)
+        padded = self.pad_signal(data)
         
-        unpadded_len = jnp.floor((input.shape[1] - token_dim) / (token_dim - overlap_per_token) + 1, dtype=jnp.int32)
-        mask = jnp.zeros(max_tokens)
-        mask = mask.at[:unpadded_len].set(1)
+        
+        # Tokenize the data:
+        # 1. Token = padded[i:i+token_dim] or segments of token_dim length
+        # 2. for i starting at 0, increasing by token_dim-overlap_per_token
+        # 3. until i+token_dim >= len(padded)
+        tokenized = jnp.zeros((self.max_tokens, self.token_dim))
+        
+        return self.populate_tokens(self, padded, tokenized)
 
-    def detokenize(self, tokens):
-        ## Put detokenization code here
-        pass
-    
     @vmap
+    @jit
     def pad_signal(self, data):
-        padding_length = self.get_tokens_from_len(data.shape[-1])
-        clip_len = jnp.min(data.shape[-1], self.max_len)
+        complete_tokens = jnp.min(self.get_tokens_from_len(data.shape[-1]), self.max_tokens)
+        tokenized_len = self.get_len_from_tokens(complete_tokens)
         padded = jnp.zeros(self.max_len)
-        padded = padded.at[:clip_len].set(input)
-        return padded, padding_length
+        padded = padded.at[:tokenized_len].set(data[:tokenized_len])
+        return padded
+    
+    def populate_tokens(self, padded, tokenized, i=0):
+        
+        if i < self.max_tokens:
+            start = i*self.token_dim_no_overlap
+            end = start + self.token_dim
+            
+            tokenized = tokenized.at[i].set(padded[:, start:end])
+            return self.fill_in_padding(padded, tokenized, i+1)
+        else:
+            return tokenized
+    
+    ## DETOKENIZAITON FUNCTIONS ##
+    @vmap
+    @jit
+    def detokenize(self, tokens):
+        
+        return self.combine_tokens(
+            tokens=tokens, 
+            output=jnp.zeros(self.max_len), 
+            tokens_left=tokens.shape[0],
+        )
+    
+    def combine_tokens(self, tokens, output, tokens_left):
+        # Pseudo code:
+        # take the initial token array with input shape (tokens_left, self.token_dim)
+        # if tokens_left > 1:
+        #     handleoverlap(output, tokens[0])
+        #     take the first token and add it to the output array
+        #     return combine_tokens(tokens[1:], tokens_left-1)
+        # else:
+        #     return output
+        
+        if tokens_left > 1:
+            token = tokens[0]
+            
+            i = self.max_tokens - tokens_left
+            overlap_start = self.token_dim_no_overlap*i
+            overlap_end = overlap_start + self.overlap_per_token
+            
+            token = token.at[:self.overlap_per_token].set(self.overlap_combine_fn(
+                output[overlap_start:overlap_end], 
+                token[:self.overlap_per_token],
+            ))
+            
+            output = output.at[overlap_start:overlap_start+self.token_dim].set(token)
+            
+            return self.combine_tokens(tokens[1:], output, tokens_left-1)
+        else:
+            return output
+    
+    def overlap_combine_fn(self, overlap_1, overlap_2):
+        return (overlap_1 + overlap_2) / 2
     
     def get_len_from_tokens(self, tokens) -> int:
-        return tokens*(self.token_dim - self.overlap_per_token) + self.overlap_per_token
+        return tokens*self.token_dim_no_overlap + self.overlap_per_token
     
     def get_tokens_from_len(self, length) -> int:
-        return (length - self.overlap_per_token) // (self.token_dim - self.overlap_per_token) + 1
+        return (length - self.overlap_per_token) // self.token_dim_no_overlap + 1
     

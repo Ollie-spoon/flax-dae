@@ -15,6 +15,7 @@ from models import ConvolutionalBlock
 
 ## DONE:
 ## 1. Implement the embedding layer
+## 2. Implement the unembedding layer
 
 class TransformerConfig:
     
@@ -56,95 +57,6 @@ class TransformerConfig:
     # Deterministic mode
     deterministic: bool = False
     
-class Tokenizer(nn.Module):
-    
-    config: TransformerConfig
-    
-    def setup(self, config):
-        self.token_dim = config.token_dim
-        self.overlap = config.overlap_per_token
-        self.max_tokens = config.max_tokens
-        self.min_tokens = config.min_tokens
-        
-        self.max_len = self.get_len_from_tokens(self.max_tokens)
-        self.min_len = self.get_len_from_tokens(self.min_tokens)
-        
-        
-        
-        return super().setup()
-    
-    def __call__(self, inputs):
-        """Applies Transformer Tokenizer module.
-        
-        Tokenize input sequence into overlapping tokens.
-        """
-        
-        # Clip input sequence to fit tokens
-        temp = jnp.zeros((inputs.shape[0], self.max_len))
-        
-        
-        token_clip_len = (inputs.shape[1] - token_dim) % (token_dim - overlap_per_token)
-        seq_len = inputs.shape[1] - token_clip_len
-        inputs = inputs[:, :seq_len]
-        
-        # Calculate number of tokens
-        num_tokens = (seq_len - token_dim)//(token_dim - overlap_per_token) + 1
-        num_tokens = min(num_tokens, max_tokens)
-        
-        # Stack tokens - This should result in a shape of (batch_size, num_tokens, token_dim)
-        tokens = jnp.stack([inputs[:, i:i+token_dim] for i in range(0, seq_len-overlap_per_token, token_dim-overlap_per_token)], axis=1)
-
-        return tokens
-    
-    def get_len_from_tokens(self, tokens):
-        """Calculates the length of the input sequence from tokens.
-        
-        Calculates the length of the input sequence from tokens.
-        """
-        return tokens*(self.token_dim - self.overlap) + self.overlap
-    
-    @vmap
-    def padd_signal(self, input):
-        """Pads input sequence to fit tokens.
-        
-        Pads input sequence to fit tokens.
-        """
-        
-        chex.assert_rank(input, 1)
-        assert input >= self.token_dim, f"Input sequence length must be at least {self.token_dim}."
-        
-        
-        clip_len = jnp.min(input.shape[-1], self.max_len)
-        padded = jnp.zeros(self.max_len)
-        padded = padded.at[:clip_len].set(input)
-        
-        unpadded_len = jnp.floor((input.shape[1] - token_dim) / (token_dim - overlap_per_token) + 1, dtype=jnp.int32)
-        mask = jnp.zeros(max_tokens)
-        mask = mask.at[:unpadded_len].set(1)
-        
-        return inputs
-    
-class Detokenizer(nn.Module):
-    
-    config: TransformerConfig
-    
-    def __call__(self, tokens):
-        """Applies Transformer Detokenizer module.
-        
-        Detokenize token sequence into a single sequence.
-        """
-        config = self.config
-        token_dim = config.token_dim
-        overlap_per_token = config.overlap_per_token
-        
-        # Calculate sequence length
-        seq_len = tokens.shape[1]*(token_dim - overlap_per_token) + overlap_per_token
-        
-        # Stack tokens - This should result in a shape of (batch_size, seq_len)
-        seq = jnp.concatenate([tokens[:, i, :] for i in range(tokens.shape[1])], axis=0)
-
-        return seq
-    
 class Embedding(nn.Module):
     
     config: TransformerConfig
@@ -162,7 +74,7 @@ class Embedding(nn.Module):
         features = config.embed_features
         max_tokens = config.max_tokens
         
-        x = jnp.reshape(inputs, (*inputs.shape , 1))
+        x = jnp.reshape(inputs, (*inputs.shape, 1))
         
         # Embedding layer (64 -> 60)
         x = nn.Conv(features=features, kernel_size=5, padding='VALID')(x)
@@ -210,9 +122,9 @@ class Unembedding(nn.Module):
         # chex.assert_equal(inputs.shape[1], config.embed_dim)
         
         config = self.config
-        embed_dim = config.embed_dim
+        # embed_dim = config.embed_dim
         features = config.embed_features
-        max_tokens = config.max_tokens
+        # max_tokens = config.max_tokens
         
         x = jnp.reshape(inputs, (*inputs.shape, 1))
         
@@ -233,9 +145,9 @@ class Unembedding(nn.Module):
         
         # Flatten (16 features -> 1 feature)
         x = nn.ConvTranspose(features=1, kernel_size=1, padding='VALID')(x)
-        x = nn.LayerNorm()(x)
-        x = nn.gelu(x)
-        x = jnp.reshape(x, (x.shape[0], x.shape[1]))
+        # x = nn.LayerNorm()(x)
+        # x = nn.gelu(x)
+        x = jnp.reshape(x, x.shape[:-1])
         
         return x
 
@@ -244,7 +156,6 @@ class MlpBlock(nn.Module):
 
     Args:
         config: TransformerConfig dataclass containing hyperparameters.
-        out_dim: optionally specify out dimension.
     """
 
     config: TransformerConfig
@@ -270,10 +181,8 @@ class MlpBlock(nn.Module):
                 bias_init=nn.with_logical_partitioning(config.bias_init, ('mlp',)),
         )(inputs)
         x = nn.gelu(x)
-        x = nn.Dropout(rate=config.dropout_rate)(
-                x, deterministic=config.deterministic
-        )
-        output = nn.Dense(
+        x = nn.Dropout(rate=config.dropout_rate)(x, deterministic=config.deterministic)
+        x = nn.Dense(
                 actual_out_dim,
                 dtype=config.dtype,
                 kernel_init=nn.with_logical_partitioning(
@@ -281,9 +190,43 @@ class MlpBlock(nn.Module):
                 ),
                 bias_init=nn.with_logical_partitioning(config.bias_init, ('embed',)),
         )(x)
-        output = nn.Dropout(rate=config.dropout_rate)(
-                output, deterministic=config.deterministic
-        )
-        return output
+        x = nn.Dropout(rate=config.dropout_rate)(x, deterministic=config.deterministic)
+        return x
+    
+class EncoderBlock(nn.Module):
+    
+    config: TransformerConfig
+    
+    def __call__(self, inputs):
+        """Applies Transformer EncoderBlock module.
+        
+        Encoder block with multi-head self-attention and feed-forward layer.
+        """
+        config = self.config
+        embed_dim = config.embed_dim
+        qkv_dim = config.qkv_dim
+        num_heads = config.num_heads
+        attn_dropout_rate = config.attn_dropout_rate
+        eps = config.eps
+        
+        ## Layernorm before attention and MLP because this stabilizes the training
+        
+        # Multi-head self-attention
+        x = nn.LayerNorm()(inputs)
+        x = nn.MultiHeadDotProductAttention(
+            num_heads=num_heads, 
+            qkv_features=qkv_dim, 
+            dropout_rate=attn_dropout_rate,
+            deterministic=config.deterministic,
+        )(x, mask=None)
+        # There could be a dropout layer here
+        x = x + inputs
+        
+        # Feed-forward block
+        y = nn.LayerNorm()(x)
+        y = MlpBlock(config)(y)
+        
+        return x + y
+
 
 

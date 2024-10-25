@@ -65,8 +65,8 @@ def get_config():
         "wt": 0.0,
         "t": 1.0,
         "fft_m": 1.0,
-        "fft_p": 1.0,
-        "fft_m_max": 0.0,
+        "fft_p": 2.0,
+        "fft_m_max": 0.1,
         "fft_p_max": 0.0,
         "fft_m_struct": 1.0,
         "l2": 0.005,
@@ -94,7 +94,7 @@ def get_config():
     config.io_dim = config.data_args["t_len"]
     config.batch_size = 1250
     config.epoch_size = 12500
-    config.num_epochs = 5000
+    config.num_epochs = 200
     config.cycles_per_epoch = 5
     config.data_path = 'C:/Users/omnic/OneDrive/Documents/MIT/Programming/approximation_coefficients_dataset.npy'
     config.checkpoint_restore_path = ""
