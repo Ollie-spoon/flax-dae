@@ -280,11 +280,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict):
         
         
         # Print the evaluation metrics and catch NaNs
-        if (epoch + 1) % 1 == 0:
-            loss.print_metrics(metrics, f"epoch: {epoch + 1}, time {time()-start_time:.2f}s, ")
-            if jnp.isnan(metrics['loss']):
-                logging.info("NaN loss detected. Exiting training.")
-                break
+        # if (epoch + 1) % 1 == 0:
+        loss.print_metrics(metrics, f"epoch: {epoch + 1}, time {time()-start_time:.2f}s, ")
+        if jnp.isnan(metrics['loss']):
+            # logging.info("NaN loss detected. Exiting training.")
+            # break
+            revert_count += 1
+            state = prev_state
+            print("NaN loss detected. Reverting and trying again.")
+            continue
         
         # Check for gradient explosion
         if revert_count < 4 and epoch > 10 and metrics["loss"] > 50 * prev_loss:
